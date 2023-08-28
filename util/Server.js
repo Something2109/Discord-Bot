@@ -5,6 +5,10 @@ const rootPath = path.dirname(path.dirname(__filename));
 
 const Server = {
     rcon: undefined,
+    /**
+     * Start the Minecraft server.
+     * @returns a boolean coordinating the starting state.
+     */
     async start() {
         let connected = await this.isConnected();
         if (!connected) {
@@ -15,11 +19,16 @@ const Server = {
                     }
                 }
             );
+            setTimeout(() => this.starting = false, 15000);
             return false;
         } else {
             return true;
         }
     },
+    /**
+     * Connect the bot to the minecraft rcon.
+     * @returns The Rcon object if the connection established successfully else undefined.
+     */
     async connect() {
         try {
             if (!this.rcon) {
@@ -37,14 +46,25 @@ const Server = {
         }
         return undefined;
     },
+    /**
+     * Check if these is a connection to server.
+     * @returns a boolean showing the state of connection.
+     */
     async isConnected() {
         let connection = await this.connect();
         return (connection instanceof Rcon);
     },
+    /**
+     * Disconnect the bot from the server.
+     */
     async disconnect() {
         this.rcon.end();
         this.rcon = undefined;
     },
+    /**
+     * Stop the minecraft through rcon.
+     * @returns a boolean stating the stop state.
+     */
     async stop() {
         try {
             let rcon = await this.connect();

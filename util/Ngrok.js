@@ -1,4 +1,8 @@
 const Ngrok = {
+    /**
+     * Start a ngrok tunnel to the minecraft server port.
+     * @returns the tunnel started or undefined if error happens
+     */
     async start() {
         try {
             let response = await fetch(
@@ -27,6 +31,10 @@ const Ngrok = {
         }
         return undefined;
     },
+    /**
+     * Get the running Ngrok tunnel.
+     * @return the running tunnel or undefined if none running.
+     */
     async connect() {
         try {
             let response = await fetch(
@@ -49,6 +57,10 @@ const Ngrok = {
         }
         return undefined;
     },
+    /**
+     * Stop the running Ngrok tunnel.
+     * @returns a boolean stating the state of the command.
+     */
     async stop() {
         let tunnel = await this.connect();
         if (tunnel) {

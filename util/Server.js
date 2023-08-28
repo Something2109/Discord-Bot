@@ -23,9 +23,9 @@ const Server = {
         try {
             if (!this.rcon) {
                 this.rcon = await Rcon.connect({
-                    host: "localhost",
-                    port: 25575,
-                    password: "12345678"
+                    host: process.env.MC_HOST,
+                    port: process.env.MC_RCON_PORT,
+                    password: process.env.MC_RCON_PASSWORD
                 })
             }
             return this.rcon;
@@ -33,8 +33,8 @@ const Server = {
             if (error.code !== 'ECONNREFUSED') {
                 console.log(error);
             }
-            return undefined;
         }
+        return undefined;
     },
     async isConnected() {
         let connection = await this.connect();
@@ -54,13 +54,12 @@ const Server = {
                     return true;
                 }
             }
-            return false;
         } catch (error) {
             if (error.code !== 'ECONNREFUSED') {
                 console.log(error);
             }
-            return false;
         }
+        return false;
     }
 }
 

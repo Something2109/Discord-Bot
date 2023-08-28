@@ -13,7 +13,8 @@ const Server = {
                     if (error) {
                         console.error(error);
                     }
-                });
+                }
+            );
             return false;
         } else {
             return true;

@@ -11,7 +11,7 @@ const commands = readCommands();
 
 client.commands = commands.collection;
 
-refreshCommands(commands.list, process.env);
+refreshCommands(commands.list);
 
 initEvent(client);
 

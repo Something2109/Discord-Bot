@@ -28,15 +28,15 @@ function readCommands() {
     return commands
 }
 
-async function refreshCommands(commands, env) {
+async function refreshCommands(commands) {
     try {
-        const rest = new REST().setToken(env.TOKEN);
+        const rest = new REST().setToken(process.env.TOKEN);
 
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
         // The put method is used to fully refresh all commands in the guild with the current set
         const data = await rest.put(
-            Routes.applicationGuildCommands(env.CLIENT_ID, env.GUILD_ID),
+            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
             { body: commands },
         );
 

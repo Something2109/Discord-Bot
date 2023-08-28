@@ -5,13 +5,15 @@ const rootPath = path.dirname(path.dirname(__filename));
 
 const Server = {
     rcon: undefined,
+    starting: false,
     /**
      * Start the Minecraft server.
-     * @returns a boolean coordinating the starting state.
+     * @returns a boolean showing the state of the server before start.
      */
     async start() {
-        let connected = await this.isConnected();
-        if (!connected) {
+        let connection = await this.isConnected();
+        if (connection == false) {
+            this.starting = true;
             childProcess.execFile(path.join(rootPath, "bin\\mc-server.bat"),
                 function (error, stdout, stderr) {
                     if (error) {
@@ -20,13 +22,12 @@ const Server = {
                 }
             );
             setTimeout(() => this.starting = false, 15000);
-            return false;
-        } else {
-            return true;
         }
+        return connection;
     },
     /**
      * Connect the bot to the minecraft rcon.
+     * Shouldn't be called outside of the object to prevent outside adjustment of the rcon.
      * @returns The Rcon object if the connection established successfully else undefined.
      */
     async connect() {
@@ -48,9 +49,13 @@ const Server = {
     },
     /**
      * Check if these is a connection to server.
-     * @returns a boolean showing the state of connection.
+     * @returns a boolean showing the state of connection 
+     * or undefined if the server on starting state.
      */
     async isConnected() {
+        if (this.starting) {
+            return undefined;
+        }
         let connection = await this.connect();
         return (connection instanceof Rcon);
     },
@@ -63,16 +68,15 @@ const Server = {
     },
     /**
      * Stop the minecraft through rcon.
-     * @returns a boolean stating the stop state.
+     * @returns a boolean showing the state of the server before stop.
      */
     async stop() {
+        let connection = await this.isConnected();
         try {
-            let rcon = await this.connect();
-            if (rcon) {
-                let response = await rcon.send("stop");
+            if (connection) {
+                let response = await this.rcon.send("stop");
                 if (response) {
                     this.disconnect();
-                    return true;
                 }
             }
         } catch (error) {
@@ -80,7 +84,7 @@ const Server = {
                 console.log(error);
             }
         }
-        return false;
+        return connection;
     }
 }
 

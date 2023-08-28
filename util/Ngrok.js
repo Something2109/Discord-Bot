@@ -1,9 +1,20 @@
 const Ngrok = {
     /**
-     * Start a ngrok tunnel to the minecraft server port.
-     * @returns the tunnel started or undefined if error happens
+     * Check the running tunnel and create one if none running.
+     * @returns the tunnel running or created.
      */
     async start() {
+        let tunnel = await this.connect();
+        if (!tunnel) {
+            tunnel = await this.create();
+        }
+        return tunnel;
+    },
+    /**
+     * Create a ngrok tunnel to the minecraft server port.
+     * @returns the tunnel started or undefined if error happens.
+     */
+    async create() {
         try {
             let response = await fetch(
                 `http://${process.env.NGROK_CONTROL}/api/tunnels`,

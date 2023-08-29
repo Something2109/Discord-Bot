@@ -3,13 +3,22 @@ const { Events } = require('discord.js');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
-        if (!interaction.isChatInputCommand()) return;
+        let commandName = undefined;
 
-        const command = interaction.client.commands.get(interaction.commandName);
+        if (interaction.isChatInputCommand()) {
+            commandName = interaction.commandName;
+        } else if (interaction.isButton()) {
+            [commandName, ...arg] = interaction.customId.split(' ');
+        }
 
+        command = interaction.client.commands.get(commandName);
         if (!command) {
             console.error(`No command matching ${interaction.commandName} was found.`);
             return;
+        } else {
+            console.log(
+                `[CMD]: ${interaction.user.username} commands ${commandName}.`
+            );
         }
 
         try {

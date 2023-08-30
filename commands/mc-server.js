@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const Server = require('../util/Server');
 const Ngrok = require('../util/Ngrok');
 
@@ -19,50 +19,103 @@ const data = new SlashCommandBuilder()
             .setDescription('Show the status of the minecraft server')
     );
 
-const serverReply = {
+const reply = {
     on: {
         start: "Server has already started",
-        stop: "Stopping server",
+        stop: "Failed to stop server",
         status: "Server is running",
     },
     off: {
-        start: "Starting server",
+        start: "Failed to start server",
         stop: "Server has already stopped",
         status: "Server is not running"
     },
     starting: {
         start: "Server is starting",
+        stop: "Server is stopping",
+        status: "Server is starting or stopping"
     },
-    get(subcommand, status) {
+    get(subcommand, status, tunnel) {
+        let serverReply = this.starting[subcommand];
+        let ngrokReply = `Ngrok is not running`;
+
         if (status) {
-            return this.on[subcommand];
+            serverReply = this.on[subcommand];
         } else if (status === false) {
-            return this.off[subcommand];
+            serverReply = this.off[subcommand];
         }
-        return this.starting;
+
+        if (tunnel) {
+            ngrokReply = `Ngrok running at ${tunnel.public_url}`;
+        }
+
+        return `${serverReply}\n${ngrokReply}`;
     }
 }
 
+const buttons = {
+    start: new ButtonBuilder()
+        .setCustomId(`${data.name} start`)
+        .setLabel('Start')
+        .setStyle(ButtonStyle.Success),
+    stop: new ButtonBuilder()
+        .setCustomId(`${data.name} stop`)
+        .setLabel('Stop')
+        .setStyle(ButtonStyle.Danger),
+    status: new ButtonBuilder()
+        .setCustomId(`${data.name} status`)
+        .setLabel('Status')
+        .setStyle(ButtonStyle.Secondary),
+    get(status) {
+        if (status) {
+            return new ActionRowBuilder()
+                .addComponents(this.status, this.stop);
+        } else if (status == false) {
+            return new ActionRowBuilder()
+                .addComponents(this.start, this.status);
+        } else {
+            return undefined;
+        }
+    }
+}
+
+let previousMsg = undefined;
+
 /**
- * Test the connection after starting the server.
+ * Get the subcommand to progress to the server.
  * @param {} interaction 
- * The start server interaction object.
+ * @returns The needed subcommand.
+ */
+function getSubcommand(interaction) {
+    if (interaction.isChatInputCommand()) {
+        return interaction.options.getSubcommand();
+    } else if (interaction.isButton()) {
+        let subcommand = undefined;
+        [command, subcommand, ...arg] = interaction.customId.split(' ');
+        return subcommand;
+    }
+    return undefined;
+}
+
+/**
+ * Test the connection after starting or stopping the server.
+ * @param {} interaction 
+ * The interaction object.
  */
 function testConnection(interaction, onSuccess, onFail, status) {
     let remainTestTime = 10
     let connectionTest = setInterval(() => {
         Server.status().then((res) => {
-            if (res && status) {
-                interaction.followUp(onSuccess);
-                clearInterval(connectionTest);
-            } else if (res == false && !status) {
-                interaction.followUp(onSuccess);
-                clearInterval(connectionTest);
-            } else if (remainTestTime === 0) {
-                interaction.followUp(onFail);
+            if (res !== status && remainTestTime > 0) {
+                remainTestTime--;
+            } else {
+                let buttonRow = buttons.get(res);
+                interaction.followUp({
+                    content: (res === status) ? onSuccess : onFail,
+                    components: (buttonRow) ? [buttonRow] : []
+                }).then(message => previousMsg = message);
                 clearInterval(connectionTest);
             }
-            remainTestTime--;
         })
     }, 1000);
 }
@@ -70,29 +123,30 @@ function testConnection(interaction, onSuccess, onFail, status) {
 module.exports = {
     data: data,
     async execute(interaction) {
-        await interaction.deferReply();
-
-        let subcommand = interaction.options.getSubcommand();
-
-        let status = await Server[subcommand]();
-        let tunnel = await Ngrok[subcommand]();
-
-        if (tunnel) {
-            reply = `${serverReply.get(subcommand, status)}\nNgrok running at ${tunnel.public_url}`;
-        } else {
-            reply = `${serverReply.get(subcommand, status)}\nNgrok is not running`;
+        if (previousMsg) {
+            await previousMsg.edit({
+                components: []
+            })
         }
 
-        await interaction.editReply(reply);
+        await interaction.deferReply();
 
-        if (subcommand == 'start' || subcommand == 'stop') {
-            if (subcommand == 'start' ^ status) {
-                testConnection(interaction,
-                    onSuccess = `Server ${subcommand}s successfully`,
-                    onFail = `Server fails to ${subcommand}`,
-                    status = !status
-                );
-            }
+        let subcommand = getSubcommand(interaction);
+        let status = await Server[subcommand]();
+        let tunnel = await Ngrok[subcommand]();
+        let buttonRow = buttons.get(status);
+
+        previousMsg = await interaction.editReply({
+            content: reply.get(subcommand, status, tunnel),
+            components: (buttonRow) ? [buttonRow] : []
+        });
+
+        if ((subcommand == 'start' || subcommand == 'stop') && status == undefined) {
+            testConnection(interaction,
+                onSuccess = `Server ${subcommand}s successfully`,
+                onFail = `Server fails to ${subcommand}`,
+                status = subcommand == 'start'
+            );
         }
     },
 };

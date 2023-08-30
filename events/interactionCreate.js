@@ -12,14 +12,6 @@ module.exports = {
         }
 
         command = interaction.client.commands.get(commandName);
-        if (!command) {
-            console.error(`No command matching ${interaction.commandName} was found.`);
-            return;
-        } else {
-            console.log(
-                `[CMD]: ${interaction.user.username} commands ${commandName}.`
-            );
-        }
 
         try {
             await command.execute(interaction);

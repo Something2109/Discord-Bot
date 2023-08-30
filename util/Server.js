@@ -21,6 +21,7 @@ const Server = {
                     }
                 }
             );
+            connection = await this.status();
             setTimeout(() => this.starting = false, 5000);
         }
         return connection;
@@ -51,6 +52,7 @@ const Server = {
                 if (response) {
                     this.disconnect();
                 }
+                connection = await this.status();
                 setTimeout(() => this.starting = false, 1000);
             }
         } catch (error) {
@@ -79,6 +81,7 @@ const Server = {
             if (error.code !== 'ECONNREFUSED') {
                 console.log(error);
             }
+            this.rcon = undefined;
         }
         return undefined;
     },

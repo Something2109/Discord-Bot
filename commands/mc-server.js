@@ -87,14 +87,14 @@ let previousMsg = undefined;
  * @returns The needed subcommand.
  */
 function getSubcommand(interaction) {
+    let subcommand = undefined;
     if (interaction.isChatInputCommand()) {
-        return interaction.options.getSubcommand();
+        subcommand = interaction.options.getSubcommand();
     } else if (interaction.isButton()) {
-        let subcommand = undefined;
         [command, subcommand, ...arg] = interaction.customId.split(' ');
-        return subcommand;
     }
-    return undefined;
+    console.log(`[CMD]: Executing command mc-server ${subcommand}`)
+    return subcommand;
 }
 
 /**
@@ -106,7 +106,9 @@ function testConnection(interaction, onSuccess, onFail, status) {
     let remainTestTime = 10
     let connectionTest = setInterval(() => {
         Server.status().then((res) => {
-            if (res !== status && remainTestTime > 0) {
+            if (res == undefined) {
+                return;
+            } else if (res !== status && remainTestTime > 0) {
                 remainTestTime--;
             } else {
                 let buttonRow = buttons.get(res);
@@ -144,7 +146,7 @@ module.exports = {
         if ((subcommand == 'start' || subcommand == 'stop') && status == undefined) {
             testConnection(interaction,
                 onSuccess = `Server ${subcommand}s successfully`,
-                onFail = `Server fails to ${subcommand}`,
+                onFail = `Server fails to ${subcommand} in the test`,
                 status = subcommand == 'start'
             );
         }

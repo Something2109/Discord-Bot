@@ -1,3 +1,8 @@
+/**
+ * Ngrok object used to interact with the Ngrok service.
+ * All the functions return the tunnel object if these is a tunnel running
+ * or undefined if these is none.
+ */
 const Ngrok = {
     /**
      * Check the running tunnel and create one if none running.
@@ -15,6 +20,7 @@ const Ngrok = {
      * @return the running tunnel or undefined if none running.
      */
     async status() {
+        let tunnel = undefined;
         try {
             let response = await fetch(
                 `http://${process.env.NGROK_CONTROL}/api/tunnels`,
@@ -24,9 +30,9 @@ const Ngrok = {
             );
             if (response.ok) {
                 let object = await response.json();
-                let tunnel = object.tunnels;
-                if (tunnel.length > 0) {
-                    return tunnel[0];
+                let tunnel_arr = object.tunnels;
+                if (tunnel_arr && tunnel_arr.length > 0) {
+                    tunnel = tunnel_arr[0];
                 }
             }
         } catch (error) {
@@ -34,7 +40,7 @@ const Ngrok = {
                 console.log(error);
             }
         }
-        return undefined;
+        return tunnel;
     },
     /**
      * Stop the running Ngrok tunnel.
@@ -51,7 +57,7 @@ const Ngrok = {
                     }
                 );
                 if (response.ok) {
-                    return false;
+                    tunnel = undefined;
                 }
             } catch (error) {
                 if (error.code !== 'ECONNREFUSED') {

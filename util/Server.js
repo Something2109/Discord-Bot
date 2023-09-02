@@ -13,6 +13,7 @@ const rootPath = path.dirname(path.dirname(__filename));
 const Server = {
     rcon: undefined,
     starting: false,
+    players: 0,
     /**
      * Start the Minecraft server.
      * @returns a boolean showing the state of the server.
@@ -64,7 +65,7 @@ const Server = {
     async stop() {
         let connection = await this.status();
         try {
-            if (connection) {
+            if (connection && this.players == 0) {
                 this.starting = true;
                 setTimeout(() => this.starting = false, 5000);
 
@@ -82,7 +83,7 @@ const Server = {
             }
             await this.disconnect();
         }
-        console.log(`[MCS]: Stop function result: ${connection}`)
+        console.log(`[MCS]: Stop function result: ${connection}`);
         return connection;
     },
     /**
@@ -98,16 +99,20 @@ const Server = {
                     port: process.env.MC_RCON_PORT,
                     password: process.env.MC_RCON_PASSWORD
                 })
-            } else {
-                await this.rcon.send("say Testing connection");
+            }
+            let response = await this.rcon.send("list");
+            if (response) {
+                let pos = response.match(/[0-9]+/).index;
+                this.players = parseInt(response.substring(pos, response.indexOf(' ', pos)));
             }
         } catch (error) {
             if (error.code !== 'ECONNREFUSED') {
                 console.log(error);
             }
             this.rcon = undefined;
+            this.players = 0;
         }
-        console.log(`[MCS]: Testing connection result: ${this.rcon}`)
+        console.log(`[MCS]: Testing connection result: ${this.rcon}, player: ${this.players}`);
         return this.rcon;
     },
     /**
@@ -122,6 +127,7 @@ const Server = {
             }
         }
         this.rcon = undefined;
+        this.players = 0;
     }
 }
 

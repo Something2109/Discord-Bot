@@ -87,7 +87,7 @@ const Server = {
         return connection;
     },
     /**
-     * Connect the bot to the minecraft rcon.
+     * Connect the bot to the minecraft rcon and refresh the player number.
      * Shouldn't be called outside of the object to prevent outside adjustment of the rcon.
      * @returns The Rcon object if the connection established successfully else undefined.
      */

@@ -25,7 +25,7 @@ function readCommands() {
         }
     }
 
-    return commands
+    return commands;
 }
 
 async function refreshCommands(commands) {
@@ -66,4 +66,4 @@ module.exports = {
     readCommands,
     refreshCommands,
     initEvent
-}
+};

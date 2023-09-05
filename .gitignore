@@ -1,2 +1,4 @@
 .env
+*.map
 node_modules
+out

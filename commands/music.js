@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
-const Player = require('../util/Player');
+const { Player } = require('../utils/Player');
 
 const data = new SlashCommandBuilder()
     .setName('music')

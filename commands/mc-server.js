@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
-const Server = require('../util/Server');
-const Ngrok = require('../util/Ngrok');
+const { Server } = require('../utils/Server');
+const { Ngrok } = require('../utils/Ngrok');
 
 const data = new SlashCommandBuilder()
     .setName('mc-server')
@@ -80,6 +80,8 @@ const buttons = {
 }
 
 let previousMsg = undefined;
+const server = new Server();
+const ngrok = new Ngrok();
 
 /**
  * Get the subcommand to progress to the server.
@@ -105,7 +107,7 @@ function getSubcommand(interaction) {
 function testConnection(interaction, onSuccess, onFail, status) {
     let remainTestTime = 10
     let connectionTest = setInterval(() => {
-        Server.status().then((res) => {
+        server.status().then((res) => {
             if (res == undefined) {
                 return;
             } else if (res !== status && remainTestTime > 0) {
@@ -134,8 +136,8 @@ module.exports = {
         await interaction.deferReply();
 
         let subcommand = getSubcommand(interaction);
-        let status = await Server[subcommand]();
-        let tunnel = await Ngrok[subcommand]();
+        let status = await server[subcommand]();
+        let tunnel = await ngrok[subcommand]();
         let buttonRow = buttons.get(status);
 
         previousMsg = await interaction.editReply({

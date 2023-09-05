@@ -1,5 +1,5 @@
 require('dotenv').config()
-const { readCommands, refreshCommands, initEvent } = require('./util/utils');
+const { readCommands, refreshCommands, initEvent } = require('./utils/utils');
 const path = require('node:path');
 
 // Require the necessary discord.js classes

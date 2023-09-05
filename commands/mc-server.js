@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
-const Server = require('../util/Server');
-const Ngrok = require('../util/Ngrok');
+const Server = require('../utils/Server');
+const Ngrok = require('../utils/Ngrok');
 
 const data = new SlashCommandBuilder()
     .setName('mc-server')

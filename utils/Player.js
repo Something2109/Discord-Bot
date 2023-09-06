@@ -13,17 +13,20 @@ class Player {
                 console.log(`Player transitioned from ${oldState.status} to ${newState.status}`);
             })
             .on('error', error => {
-                console.error(`Error: ${error.message} with resources`);
+                console.error(`Audio Player Error: ${error.message} with resources`);
+            })
+            .on(AudioPlayerStatus.Playing, () => {
+                this.#playing.channel.send({
+                    content: `Playing ${this.#playing.title}`
+                })
             })
             .on(AudioPlayerStatus.Idle, () => {
                 if (this.#loop) {
                     this.#play();
                 }
-                else if (this.#queue.length > 0) {
-                    this.#playing = this.queue.shift();
+                else {
+                    this.#playing = this.#queue.shift();
                     this.#play();
-                } else {
-                    this.#playing = undefined;
                 }
             });
         this.#loop = false;
@@ -35,21 +38,36 @@ class Player {
      * Play the song saved in the #playing field.
      */
     #play() {
-        const stream = ytdl(this.#playing.url, {
-            filter: 'audioonly',
-            highWaterMark: this.#playing.length * 1024 * 1024,
-        });
-        if (stream) {
-            this.#playing.channel.send({
-                content: `Playing ${this.#playing.title}`
-            })
-            const resource = createAudioResource(stream);
-            this.#player.play(resource);
+        if (this.#playing) {
+            const stream = ytdl(this.#playing.url, {
+                filter: 'audioonly',
+                highWaterMark: this.#playing.length * 1024 * 1024,
+            });
+            if (stream) {
+                const resource = createAudioResource(stream);
+                this.#player.play(resource);
+            }
         }
     }
 
     getPlayer() {
         return this.#player;
+    }
+
+    /**
+     * Validate the url string if it's a youtube link. 
+     * @param {*} url The url to validate.
+     * @returns The input url of undefined if not.
+     */
+    #validateUrl(url) {
+        if (url) {
+            let regExp = /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
+            let regExp2 = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\?v=)([^#\&\?]*).*/;
+            if (url.match(regExp) || url.match(regExp2)) {
+                return url;
+            }
+        }
+        return undefined;
     }
 
     /**
@@ -60,13 +78,28 @@ class Player {
      * @param {*} channel The channel of the sent request to send update.
      * @returns The reply string indicate the song added to the queue.
      */
-    add(url, title, length, channel) {
-        let reply = `Added the song ${title} to the queue`;;
-        if (!this.#playing) {
-            this.#playing = { url, title, length, channel };
-            this.#play();
-        } else {
-            this.#queue.push({ url, title, length, channel });
+    async add(url, channel) {
+        let reply = "Invalid youtube url";
+        if (this.#validateUrl(url)) {
+            try {
+                const info = await ytdl.getBasicInfo(url);
+                const newAudio = {
+                    url,
+                    title: info.videoDetails.title,
+                    length: Math.ceil(info.videoDetails.lengthSeconds / 60),
+                    channel: channel
+                };
+                if (!this.#playing) {
+                    this.#playing = newAudio;
+                    this.#play();
+                } else {
+                    this.#queue.push(newAudio);
+                }
+                reply = `Added the song ${newAudio.title} to the queue`;
+            } catch (error) {
+                console.log(error);
+                reply = "Cannot add the song";
+            }
         }
         return reply;
     }

@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
 const Player = require('../utils/Player');
 
 const data = new SlashCommandBuilder()
@@ -74,44 +73,24 @@ function create(channel) {
 }
 
 /**
- * Validate the url string if it's a youtube link. 
- * @param {*} url The url to validate.
- * @returns The input url of undefined if not.
- */
-function validateUrl(url) {
-    if (url) {
-        let regExp = /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
-        let regExp2 = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\?v=)([^#\&\?]*).*/;
-        if (url.match(regExp) || url.match(regExp2)) {
-            return url;
-        }
-    }
-    return undefined;
-}
-
-/**
  * Add the song from the interraction to the player.
  * @param {*} interaction The interaction command.
  * @returns The reply string indicate the adding.
  */
-async function add(interaction) {
-    let reply = "Invalid youtube url";
-    const url = interaction.options.getString('url');
-    if (validateUrl(url)) {
-        try {
-            const info = await ytdl.getBasicInfo(url);
-            reply = player.add(
-                url,
-                info.videoDetails.title,
-                Math.ceil(info.videoDetails.lengthSeconds / 60),
-                interaction.channel
-            );
-        } catch (error) {
-            console.log(error);
-            reply = "Cannot play the song";
+async function connect(interaction) {
+    if (!interaction.member.voice.channel) {
+        await interaction.reply("You need to join a voice channel to play the music");
+    } else {
+        if (!connection) {
+            create(interaction.member.voice.channel);
+        } else if (interaction.member.voice.channel.id !== connection.joinConfig.channelId) {
+            subscription.unsubscribe();
+            connection.destroy();
+            create(interaction.member.voice.channel);
         }
+        return true;
     }
-    return reply;
+    return false
 }
 
 /**
@@ -137,19 +116,13 @@ async function leave() {
  */
 async function execute(interaction) {
     let subcommand = interaction.options.getSubcommand();
-    if (!interaction.member.voice.channel) {
-        await interaction.reply("You need to join a voice channel to play the music");
-    } else {
-        if (!connection) {
-            create(interaction.member.voice.channel);
-        } else if (interaction.member.voice.channel.id !== connection.joinConfig.channelId) {
-            subscription.unsubscribe();
-            connection.destroy();
-            create(interaction.member.voice.channel);
-        }
+    let status = await connect(interaction);
+
+    if (status) {
         switch (subcommand) {
             case 'add': {
-                let reply = await add(interaction);
+                const url = interaction.options.getString('url');
+                let reply = await player.add(url, interaction.channel);
                 await interaction.reply(reply);
                 break;
             }

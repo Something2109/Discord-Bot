@@ -15,25 +15,44 @@ interface AudioInfo {
 }
 
 export class Player {
-  private player: AudioPlayer;
+  private _audioPlayer: AudioPlayer;
   private loop: boolean;
   private playing: AudioInfo | undefined;
   private queue: Array<AudioInfo>;
 
   constructor() {
-    this.player = createAudioPlayer()
+    this._audioPlayer = createAudioPlayer()
       .on("stateChange", (oldState, newState) => {
         console.log(
           `Player transitioned from ${oldState.status} to ${newState.status}`
         );
       })
       .on("error", (error) => {
-        console.error(`Error: ${error.message} with resources`);
+        console.error(`Audio Player Error: ${error.message} with resources`);
+        if (this.playing) {
+          this.playing.channel.send({
+            content: `Error when playing ${this.playing.title}: ${error.message}`,
+          });
+        }
       })
-      .on(AudioPlayerStatus.Idle, this.getNextSong);
+      .on(AudioPlayerStatus.Idle, () => {
+        if (this.loop) {
+          this.play();
+        } else {
+          this.playing = this.queue.shift();
+          this.play();
+        }
+      })
+      .on(AudioPlayerStatus.Playing, () => {
+        if (this.playing) {
+          this.playing.channel.send({
+            content: `Playing ${this.playing.title}`,
+          });
+        }
+      });
     this.loop = false;
     this.playing = undefined;
-    this.queue = [];
+    this.queue = new Array<AudioInfo>();
   }
 
   /**
@@ -46,28 +65,32 @@ export class Player {
         highWaterMark: this.playing.length * 1024 * 1024,
       });
       if (stream) {
-        this.playing.channel.send({
-          content: `Playing ${this.playing.title}`,
-        });
         const resource = createAudioResource(stream);
-        this.player.play(resource);
+        this._audioPlayer.play(resource);
       }
     }
   }
 
-  private getNextSong() {
-    if (this.loop) {
-      this.play();
-    } else if (this.queue.length > 0) {
-      this.playing = this.queue.shift();
-      this.play();
-    } else {
-      this.playing = undefined;
+  /**
+   * Validate the url string if it's a youtube link.
+   * @param url The url to validate.
+   * @returns The input url of undefined if not.
+   */
+  private validateUrl(url: string | null) {
+    if (url) {
+      let regExp =
+        /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
+      let regExp2 =
+        /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\?v=)([^#\&\?]*).*/;
+      if (url.match(regExp) || url.match(regExp2)) {
+        return url;
+      }
     }
+    return undefined;
   }
 
-  public getPlayer(): AudioPlayer {
-    return this.player;
+  public get audioPlayer(): AudioPlayer {
+    return this._audioPlayer;
   }
 
   /**
@@ -78,18 +101,31 @@ export class Player {
    * @param {TextBasedChannel} channel The channel of the sent request to send update.
    * @returns The reply string indicate the song added to the queue.
    */
-  public add(
-    url: string,
-    title: string,
-    length: number,
+  public async add(
+    url: string | null,
     channel: TextBasedChannel
-  ): string {
-    let reply = `Added the song ${title} to the queue`;
-    if (!this.playing) {
-      this.playing = { url, title, length, channel };
-      this.play();
-    } else {
-      this.queue.push({ url, title, length, channel });
+  ): Promise<string> {
+    let reply = "Invalid youtube url";
+    if (url && this.validateUrl(url)) {
+      try {
+        const info: ytdl.videoInfo = await ytdl.getBasicInfo(url!);
+        const NewAudio: AudioInfo = {
+          url,
+          title: info.videoDetails.title,
+          length: Math.ceil(parseInt(info.videoDetails.lengthSeconds) / 60),
+          channel,
+        };
+        if (!this.playing) {
+          this.playing = NewAudio;
+          this.play();
+        } else {
+          this.queue.push(NewAudio);
+        }
+        reply = `Added the song ${NewAudio.title} to the queue`;
+      } catch (error) {
+        console.log(error);
+        reply = "Cannot add the song";
+      }
     }
     return reply;
   }
@@ -99,9 +135,9 @@ export class Player {
    * @param {number} number The number of the song in the queue.
    * @returns the reply string indicate the song removed from the queue.
    */
-  public remove(number: number): string {
+  public remove(number: number | null): string {
     let reply = "Failed to remove song from the queue";
-    if (number > 0 && number <= this.queue.length) {
+    if (number && number > 0 && number <= this.queue.length) {
       let removed = this.queue.splice(number - 1, 1);
       reply = `Removed ${removed[0].title} from the queue.`;
     }
@@ -116,7 +152,7 @@ export class Player {
     let reply = "There's no song playing";
     if (this.playing) {
       reply = `Skip the song ${this.playing.title}`;
-      this.player.stop(true);
+      this._audioPlayer.stop(true);
     }
     return reply;
   }
@@ -127,7 +163,7 @@ export class Player {
    */
   public stop(): string {
     this.clearqueue();
-    this.player.stop(true);
+    this._audioPlayer.stop(true);
     return "Music stopped";
   }
 
@@ -160,7 +196,7 @@ export class Player {
    */
   public pause(): string {
     let reply = "Failed to pause the player";
-    if (this.player.pause()) {
+    if (this._audioPlayer.pause()) {
       reply = "Paused the player";
     }
     return reply;
@@ -172,7 +208,7 @@ export class Player {
    */
   public unpause(): string {
     let reply = "Failed to unpause the player";
-    if (this.player.unpause()) {
+    if (this._audioPlayer.unpause()) {
       reply = "Unpaused the player";
     }
     return reply;

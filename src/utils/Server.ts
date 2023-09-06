@@ -23,10 +23,10 @@ export class Server {
    * Start the Minecraft server.
    * @returns a boolean showing the state of the server.
    */
-  async start(): Promise<boolean | undefined> {
+  async start(): Promise<ServerStatus> {
     let connection = await this.status();
     try {
-      if (connection == false) {
+      if (connection == ServerStatus.Offline) {
         this.starting = true;
         setTimeout(() => (this.starting = false), 5000);
 
@@ -40,7 +40,7 @@ export class Server {
         );
 
         console.log("[MCS]: Run the server start bat file");
-        connection = undefined;
+        connection = ServerStatus.Starting;
       }
     } catch (error) {
       console.log(error);
@@ -54,11 +54,12 @@ export class Server {
    * @returns a boolean showing the state of connection
    * or undefined if the server on starting state.
    */
-  async status(): Promise<boolean | undefined> {
-    let status: boolean | undefined = undefined;
+  async status(): Promise<ServerStatus> {
+    let status = ServerStatus.Starting;
     if (!this.starting) {
       let connection = await this.connect();
-      status = connection instanceof Rcon;
+      status =
+        connection instanceof Rcon ? ServerStatus.Online : ServerStatus.Offline;
     }
     return status;
   }
@@ -66,10 +67,10 @@ export class Server {
    * Stop the minecraft through rcon.
    * @returns a boolean showing the state of the server.
    */
-  async stop(): Promise<boolean | undefined> {
+  async stop(): Promise<ServerStatus> {
     let connection = await this.status();
     try {
-      if (connection && this.players == 0) {
+      if (connection == ServerStatus.Online && this.players == 0) {
         this.starting = true;
         setTimeout(() => (this.starting = false), 5000);
 
@@ -79,7 +80,7 @@ export class Server {
         }
 
         console.log(`[MCS]: Stop command response: ${response}`);
-        connection = undefined;
+        connection = ServerStatus.Starting;
       }
     } catch (error) {
       console.log(error);
@@ -133,4 +134,10 @@ export class Server {
     this.rcon = undefined;
     this.players = 0;
   }
+}
+
+export enum ServerStatus {
+  Online,
+  Offline,
+  Starting,
 }

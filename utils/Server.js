@@ -23,7 +23,10 @@ const Server = {
         try {
             if (connection == false) {
                 this.starting = true;
-                setTimeout(() => this.starting = false, 5000);
+                setTimeout(
+                    () => this.starting = false,
+                    process.env.SERVER_START_INTERVAL
+                );
 
                 childProcess.execFile(path.join(rootPath, "bin\\mc-server.bat"),
                     function (error, stdout, stderr) {
@@ -67,7 +70,10 @@ const Server = {
         try {
             if (connection && this.players == 0) {
                 this.starting = true;
-                setTimeout(() => this.starting = false, 5000);
+                setTimeout(
+                    () => this.starting = false,
+                    process.env.SERVER_STOP_INTERVAL
+                );
 
                 let response = await this.rcon.send("stop");
                 if (response) {

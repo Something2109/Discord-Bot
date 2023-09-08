@@ -13,7 +13,10 @@ class Player {
                 console.log(`Player transitioned from ${oldState.status} to ${newState.status}`);
             })
             .on('error', error => {
-                console.error(`Audio Player Error: ${error.message} with resources`);
+                console.error(`Audio Player Error: ${error} with resources`);
+                this.#playing.channel.send(
+                    `Cannot play ${this.#playing.title}`
+                );
             })
             .on(AudioPlayerStatus.Playing, () => {
                 this.#playing.channel.send({

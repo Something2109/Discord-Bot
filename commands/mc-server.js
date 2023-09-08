@@ -103,7 +103,7 @@ function getSubcommand(interaction) {
  * The interaction object.
  */
 function testConnection(interaction, onSuccess, onFail, status) {
-    let remainTestTime = 10
+    let remainTestTime = process.env.SERVER_TEST_TIME;
     let connectionTest = setInterval(() => {
         Server.status().then((res) => {
             if (res == undefined) {
@@ -119,7 +119,7 @@ function testConnection(interaction, onSuccess, onFail, status) {
                 clearInterval(connectionTest);
             }
         })
-    }, 1000);
+    }, process.env.SERVER_TEST_INTERVAL);
 }
 
 module.exports = {

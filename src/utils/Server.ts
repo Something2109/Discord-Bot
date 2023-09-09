@@ -28,7 +28,10 @@ export class Server {
     try {
       if (connection == ServerStatus.Offline) {
         this.starting = true;
-        setTimeout(() => (this.starting = false), 5000);
+        setTimeout(
+          () => (this.starting = false),
+          parseInt(process.env.SERVER_START_INTERVAL!)
+        );
 
         childProcess.execFile(
           path.join(rootPath, "bin\\mc-server.bat"),
@@ -72,7 +75,10 @@ export class Server {
     try {
       if (connection == ServerStatus.Online && this.players == 0) {
         this.starting = true;
-        setTimeout(() => (this.starting = false), 5000);
+        setTimeout(
+          () => (this.starting = false),
+          parseInt(process.env.SERVER_STOP_INTERVAL!)
+        );
 
         let response = await this.rcon!.send("stop");
         if (response) {

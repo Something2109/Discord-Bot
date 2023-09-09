@@ -153,7 +153,7 @@ function testConnection(
   onFail: string,
   status: ServerStatus
 ) {
-  let remainTestTime = 10;
+  let remainTestTime = parseInt(process.env.SERVER_TEST_TIME!);
   let connectionTest = setInterval(() => {
     server.status().then((res) => {
       if (res == undefined) {
@@ -169,7 +169,7 @@ function testConnection(
         clearInterval(connectionTest);
       }
     });
-  }, 1000);
+  }, parseInt(process.env.SERVER_TEST_INTERVAL!));
 }
 
 async function execute(

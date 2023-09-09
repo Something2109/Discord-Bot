@@ -7,21 +7,22 @@ class Player {
     #playing;
     #queue;
 
-    constructor() {
+    constructor(sendUpdateMessage) {
         this.#player = createAudioPlayer()
             .on('stateChange', (oldState, newState) => {
                 console.log(`Player transitioned from ${oldState.status} to ${newState.status}`);
             })
             .on('error', error => {
                 console.error(`Audio Player Error: ${error} with resources`);
-                this.#playing.channel.send(
-                    `Cannot play ${this.#playing.title}`
-                );
+                sendUpdateMessage(`Cannot play ${this.#playing.title}`);
             })
             .on(AudioPlayerStatus.Playing, () => {
-                this.#playing.channel.send({
-                    content: `Playing ${this.#playing.title}`
-                })
+                sendUpdateMessage(
+                    `Playing ${this.#playing.title}`,
+                    this.#playing.url,
+                    undefined,
+                    this.list()
+                )
             })
             .on(AudioPlayerStatus.Idle, () => {
                 if (this.#loop) {
@@ -35,6 +36,10 @@ class Player {
         this.#loop = false;
         this.#playing = undefined;
         this.#queue = [];
+    }
+
+    getPlayer() {
+        return this.#player;
     }
 
     /**
@@ -51,10 +56,6 @@ class Player {
                 this.#player.play(resource);
             }
         }
-    }
-
-    getPlayer() {
-        return this.#player;
     }
 
     /**
@@ -149,12 +150,19 @@ class Player {
      * @returns The string of the songs in the queue.
      */
     list() {
-        let list = 'Empty queue';
+        let field = [];
         if (this.#queue.length > 0) {
-            list = `Song queue:\n${this.#queue.map((song, index) =>
-                `${index}. ${song.title}`).join('\n')}`;
+            field = this.#queue.map((info, index) => ({
+                name: `${index + 1}. ${info.title}`,
+                value: info.url,
+            }));
+        } else {
+            field.push({
+                name: "Empty queue",
+                value: "Use the /music add to add more songs to the queue",
+            });
         }
-        return list;
+        return field;
     }
 
     /**

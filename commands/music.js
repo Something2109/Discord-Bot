@@ -10,7 +10,8 @@ const data = new SlashCommandBuilder()
             .setDescription('Add a song to the player queue')
             .addStringOption(option =>
                 option.setName('url')
-                    .setDescription('The Youtube url')))
+                    .setDescription('The Youtube url')
+                    .setRequired(true)))
     .addSubcommand(subcommand =>
         subcommand.setName('remove')
             .setDescription('Remove the specified song from the queue')
@@ -40,9 +41,34 @@ const data = new SlashCommandBuilder()
         subcommand.setName('unpause')
             .setDescription('Unpause the player to leave channel'));
 
-const player = new Player();
+const player = new Player(sendUpdateMessage);
 let connection = undefined;
 let subscription = undefined;
+let updateChannel = undefined;
+
+/**
+ * Create the message to send to the discord channel.
+ * @param message The message string to send.
+ * @param url The optional url of the message.
+ * @param showQueue The indicator to show the music queue in the message.
+ * @returns The message object to send.
+ */
+function createMessage(message, url, description, field) {
+    const embed = {
+        color: 0x0099ff,
+        title: message,
+        url,
+        description,
+        fields: field,
+    };
+    return {
+        embeds: [embed],
+    };
+}
+
+function sendUpdateMessage(message, url, description, field) {
+    updateChannel.send(createMessage(message, url, description, field));
+};
 
 /**
  * Create a connection to the voice channer the user is in.
@@ -116,28 +142,37 @@ async function leave() {
  */
 async function execute(interaction) {
     let subcommand = interaction.options.getSubcommand();
-    let status = await connect(interaction);
+    updateChannel = interaction.channel;
 
+    await interaction.deferReply();
+    let status = await connect(interaction);
     if (status) {
         switch (subcommand) {
             case 'add': {
                 const url = interaction.options.getString('url');
-                let reply = await player.add(url, interaction.channel);
-                await interaction.reply(reply);
+                const reply = await player.add(url, interaction.channel);
+                await interaction.editReply(createMessage(reply, url));
                 break;
             }
             case 'remove': {
                 const number = interaction.options.getNumber('number');
-                await interaction.reply(player.remove(number));
+                const reply = player.remove(number);
+                await interaction.editReply(createMessage(reply));
+                break;
+            }
+            case 'list': {
+                const reply = "List of songs in the queue";
+                const queue = player.list();
+                await interaction.editReply(createMessage(reply, null, null, queue));
                 break;
             }
             case 'leave': {
-                let reply = await leave();
-                await interaction.reply(reply);
+                const reply = await leave();
+                await interaction.editReply(createMessage(reply));
                 break;
             }
             default: {
-                await interaction.reply(player[subcommand]());
+                await interaction.editReply(createMessage(player[subcommand]()));
             }
         }
     }

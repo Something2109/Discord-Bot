@@ -4,7 +4,7 @@ import {
   createAudioResource,
   AudioPlayerStatus,
 } from "@discordjs/voice";
-import { TextBasedChannel } from "discord.js";
+import { APIEmbedField, TextBasedChannel } from "discord.js";
 import ytdl from "ytdl-core";
 
 interface AudioInfo {
@@ -14,13 +14,22 @@ interface AudioInfo {
   channel: TextBasedChannel;
 }
 
+export interface UpdateMessageSender {
+  (
+    message: string,
+    url: string | null,
+    description: string | null,
+    field: Array<APIEmbedField>
+  ): void;
+}
+
 export class Player {
   private _audioPlayer: AudioPlayer;
   private loop: boolean;
   private playing: AudioInfo | undefined;
   private queue: Array<AudioInfo>;
 
-  constructor() {
+  constructor(sendUpdateMessage: UpdateMessageSender) {
     this._audioPlayer = createAudioPlayer()
       .on("stateChange", (oldState, newState) => {
         console.log(
@@ -30,9 +39,12 @@ export class Player {
       .on("error", (error) => {
         console.error(`Audio Player Error: ${error.message} with resources`);
         if (this.playing) {
-          this.playing.channel.send({
-            content: `Error when playing ${this.playing.title}: ${error.message}`,
-          });
+          sendUpdateMessage(
+            `Error when playing ${this.playing.title}: ${error.message}`,
+            null,
+            null,
+            []
+          );
         }
       })
       .on(AudioPlayerStatus.Idle, () => {
@@ -45,9 +57,12 @@ export class Player {
       })
       .on(AudioPlayerStatus.Playing, () => {
         if (this.playing) {
-          this.playing.channel.send({
-            content: `Playing ${this.playing.title}`,
-          });
+          sendUpdateMessage(
+            `Playing ${this.playing.title}`,
+            this.playing.url,
+            null,
+            this.list()
+          );
         }
       });
     this.loop = false;
@@ -76,7 +91,7 @@ export class Player {
    * @param url The url to validate.
    * @returns The input url of undefined if not.
    */
-  private validateUrl(url: string | null) {
+  private validateUrl(url: string | null): string | undefined {
     if (url) {
       let regExp =
         /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
@@ -95,10 +110,10 @@ export class Player {
 
   /**
    * Add a song to the player queue.
-   * @param {string} url The link of the Youtube song.
-   * @param {string} title The title to represent in the list.
-   * @param {number} length The length of the song to allocate the buffer.
-   * @param {TextBasedChannel} channel The channel of the sent request to send update.
+   * @param url The link of the Youtube song.
+   * @param title The title to represent in the list.
+   * @param length The length of the song to allocate the buffer.
+   * @param channel The channel of the sent request to send update.
    * @returns The reply string indicate the song added to the queue.
    */
   public async add(
@@ -169,16 +184,22 @@ export class Player {
 
   /**
    * Get a list of the songs in the queue.
-   * @returns The string of the songs in the queue.
+   * @returns The embed field array of the songs in the queue.
    */
-  public list(): string {
-    let list = "Empty queue";
+  public list(): Array<APIEmbedField> {
+    let field = [];
     if (this.queue.length > 0) {
-      list = `Song queue:\n${this.queue
-        .map((song, index) => `${index}. ${song.title}`)
-        .join("\n")}`;
+      field = this.queue.map((info, index) => ({
+        name: `${index + 1}. ${info.title}`,
+        value: info.url,
+      }));
+    } else {
+      field.push({
+        name: "Empty queue",
+        value: "Use the /music add to add more songs to the queue",
+      });
     }
-    return list;
+    return field;
   }
 
   /**

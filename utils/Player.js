@@ -79,10 +79,9 @@ class Player {
      * @param {*} url The link of the Youtube song. 
      * @param {*} title The title to represent in the list.
      * @param {*} length The length of the song to allocate the buffer.
-     * @param {*} channel The channel of the sent request to send update.
      * @returns The reply string indicate the song added to the queue.
      */
-    async add(url, channel) {
+    async add(url) {
         let reply = "Invalid youtube url";
         if (this.#validateUrl(url)) {
             try {
@@ -91,7 +90,6 @@ class Player {
                     url,
                     title: info.videoDetails.title,
                     length: Math.ceil(info.videoDetails.lengthSeconds / 60),
-                    channel: channel
                 };
                 if (!this.#playing) {
                     this.#playing = newAudio;

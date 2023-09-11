@@ -49,7 +49,16 @@ const reply = {
             ngrokReply = `Ngrok running at ${tunnel.public_url}`;
         }
 
-        return `${serverReply}\n${ngrokReply}`;
+        return {
+            color: 0x0099ff,
+            title: `Command ${subcommand}:`,
+            fields: [{
+                name: "Minecraft server:",
+                value: serverReply
+            }, {
+                name: "Ngrok:", value: ngrokReply
+            }],
+        };
     }
 }
 
@@ -113,7 +122,11 @@ function testConnection(interaction, onSuccess, onFail, status) {
             } else {
                 let buttonRow = buttons.get(res);
                 interaction.followUp({
-                    content: (res === status) ? onSuccess : onFail,
+                    embeds: [{
+                        color: 0x0099ff,
+                        title: "Testing connection",
+                        description: (res === status) ? onSuccess : onFail,
+                    }],
                     components: (buttonRow) ? [buttonRow] : []
                 }).then(message => previousMsg = message);
                 clearInterval(connectionTest);
@@ -134,12 +147,13 @@ module.exports = {
         await interaction.deferReply();
 
         let subcommand = getSubcommand(interaction);
-        let status = await Server[subcommand]();
-        let tunnel = await Ngrok[subcommand]();
+        let [status, tunnel] = await Promise.all([
+            Server[subcommand](), Ngrok[subcommand]()
+        ])
         let buttonRow = buttons.get(status);
 
         previousMsg = await interaction.editReply({
-            content: reply.get(subcommand, status, tunnel),
+            embeds: [reply.get(subcommand, status, tunnel)],
             components: (buttonRow) ? [buttonRow] : []
         });
 

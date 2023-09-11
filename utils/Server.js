@@ -68,7 +68,7 @@ const Server = {
     async stop() {
         let connection = await this.status();
         try {
-            if (connection && this.players == 0) {
+            if (connection) {
                 this.starting = true;
                 setTimeout(
                     () => this.starting = false,

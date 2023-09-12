@@ -11,9 +11,37 @@ const rootPath = path.dirname(path.dirname(__filename));
  * Undefined: the server is starting.
  */
 const Server = {
+    process: undefined,
     rcon: undefined,
     starting: false,
-    players: 0,
+    players: undefined,
+
+    /**
+     * Run the server in the server directory given in the .env file.
+     */
+    spawnServer() {
+        this.process = childProcess.spawn('java',
+            ['-Xmx7168M', '-Xms7168M', '-jar', 'server.jar', '-nogui'], {
+            cwd: process.env.MC_DIR,
+        });
+        this.process.stdout.on('data', (data) => {
+            console.log(`[MCS]: ${data}`);
+        });
+        this.process.stderr.on('data', (data) => {
+            console.error(`${data}`);
+            this.process.kill('SIGINT');
+            this.process = undefined;
+        });
+    },
+    /**
+     * Kill the current running server.
+     */
+    killServer() {
+        if (this.process) {
+            this.process.kill('SIGINT');
+            this.process = undefined;
+        }
+    },
     /**
      * Start the Minecraft server.
      * @returns a boolean showing the state of the server.
@@ -28,23 +56,16 @@ const Server = {
                     process.env.SERVER_START_INTERVAL
                 );
 
-                childProcess.execFile(path.join(rootPath, "bin\\mc-server.bat"),
-                    function (error, stdout, stderr) {
-                        if (error) {
-                            console.error(error);
-                        }
-                    }
-                );
+                this.spawnServer();
 
-                console.log("[MCS]: Run the server start bat file");
                 connection = undefined;
             }
         } catch (error) {
             if (error.code !== 'ECONNREFUSED') {
                 console.log(error);
             }
+            this.disconnect();
         }
-        console.log(`[MCS]: Start function result: ${connection}`)
         return connection;
     },
 
@@ -80,7 +101,6 @@ const Server = {
                     await this.disconnect();
                 }
 
-                console.log(`[MCS]: Stop command response: ${response}`);
                 connection = undefined;
             }
         } catch (error) {
@@ -89,7 +109,6 @@ const Server = {
             }
             await this.disconnect();
         }
-        console.log(`[MCS]: Stop function result: ${connection}`);
         return connection;
     },
     /**
@@ -108,17 +127,17 @@ const Server = {
             }
             let response = await this.rcon.send("list");
             if (response) {
-                let pos = response.match(/[0-9]+/).index;
-                this.players = parseInt(response.substring(pos, response.indexOf(' ', pos)));
+                this.players = response.substring(response.indexOf(':') + 1)
+                    .split(' ')
+                    .filter((value) => value.length);
             }
         } catch (error) {
             if (error.code !== 'ECONNREFUSED') {
                 console.log(error);
             }
             this.rcon = undefined;
-            this.players = 0;
+            this.players = undefined;
         }
-        console.log(`[MCS]: Testing connection result: ${this.rcon}, player: ${this.players}`);
         return this.rcon;
     },
     /**
@@ -133,7 +152,8 @@ const Server = {
             }
         }
         this.rcon = undefined;
-        this.players = 0;
+        this.players = undefined;
+        this.killServer();
     }
 }
 

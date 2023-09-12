@@ -11,7 +11,6 @@ interface AudioInfo {
   url: string;
   length: number;
   title: string;
-  channel: TextBasedChannel;
 }
 
 export interface UpdateMessageSender {
@@ -104,6 +103,15 @@ export class Player {
     return undefined;
   }
 
+  private async getVideoInfo(url: string): Promise<AudioInfo> {
+    const info: ytdl.videoInfo = await ytdl.getBasicInfo(url!);
+    return {
+      url,
+      title: info.videoDetails.title,
+      length: Math.ceil(parseInt(info.videoDetails.lengthSeconds) / 60),
+    };
+  }
+
   public get audioPlayer(): AudioPlayer {
     return this._audioPlayer;
   }
@@ -116,20 +124,11 @@ export class Player {
    * @param channel The channel of the sent request to send update.
    * @returns The reply string indicate the song added to the queue.
    */
-  public async add(
-    url: string | null,
-    channel: TextBasedChannel
-  ): Promise<string> {
+  public async add(url: string | null): Promise<string> {
     let reply = "Invalid youtube url";
     if (url && this.validateUrl(url)) {
       try {
-        const info: ytdl.videoInfo = await ytdl.getBasicInfo(url!);
-        const NewAudio: AudioInfo = {
-          url,
-          title: info.videoDetails.title,
-          length: Math.ceil(parseInt(info.videoDetails.lengthSeconds) / 60),
-          channel,
-        };
+        const NewAudio = await this.getVideoInfo(url);
         if (!this.playing) {
           this.playing = NewAudio;
           this.play();

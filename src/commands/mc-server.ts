@@ -102,18 +102,15 @@ async function executeSubcommand(
   let tunnel = undefined;
   switch (subcommand) {
     case Subcommand.Start: {
-      status = await server.start();
-      tunnel = await ngrok.start();
+      [status, tunnel] = await Promise.all([server.start(), ngrok.start()]);
       break;
     }
     case Subcommand.Status: {
-      status = await server.status();
-      tunnel = await ngrok.status();
+      [status, tunnel] = await Promise.all([server.status(), ngrok.status()]);
       break;
     }
     case Subcommand.Stop: {
-      status = await server.status();
-      tunnel = await ngrok.status();
+      [status, tunnel] = await Promise.all([server.stop(), ngrok.stop()]);
       break;
     }
   }
@@ -139,7 +136,21 @@ function getReply(
     ngrokReply = `Ngrok running at ${tunnel.public_url}`;
   }
 
-  return `${serverReply}\n${ngrokReply}`;
+  return {
+    embeds: [
+      {
+        color: 0x0099ff,
+        title: `Command ${subcommand}:`,
+        fields: [
+          {
+            name: "Minecraft server:",
+            value: serverReply,
+          },
+          { name: "Ngrok", value: ngrokReply },
+        ],
+      },
+    ],
+  };
 }
 
 /**
@@ -163,7 +174,13 @@ function testConnection(
       } else {
         interaction
           .followUp({
-            content: res === status ? onSuccess : onFail,
+            embeds: [
+              {
+                color: 0x0099ff,
+                title: "Test connection:",
+                description: res === status ? onSuccess : onFail,
+              },
+            ],
           })
           .then((message) => (previousMsg = message));
         clearInterval(connectionTest);
@@ -186,9 +203,9 @@ async function execute(
   let subcommand = getSubcommand(interaction);
   let { status, tunnel } = await executeSubcommand(subcommand);
 
-  previousMsg = await interaction.editReply({
-    content: getReply(subcommand, status, tunnel),
-  });
+  previousMsg = await interaction.editReply(
+    getReply(subcommand, status, tunnel)
+  );
 
   if (
     (subcommand == Subcommand.Start || subcommand == Subcommand.Stop) &&

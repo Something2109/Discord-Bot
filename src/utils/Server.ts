@@ -1,5 +1,5 @@
 import { Rcon } from "rcon-client";
-import childProcess from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import path from "node:path";
 const rootPath = path.dirname(path.dirname(__filename));
 
@@ -11,14 +11,50 @@ const rootPath = path.dirname(path.dirname(__filename));
  * Undefined: the server is starting.
  */
 export class Server {
+  private process: ChildProcess | undefined;
   private rcon: Rcon | undefined;
   private starting: boolean;
-  private players: number;
+  private players: Array<string> | undefined;
 
   constructor() {
+    this.process = undefined;
+    this.rcon = undefined;
     this.starting = false;
-    this.players = 0;
+    this.players = undefined;
   }
+
+  /**
+   * Run the server in the server directory given in the .env file.
+   */
+  spawnServer() {
+    this.process = spawn(
+      "java",
+      ["-Xmx7168M", "-Xms7168M", "-jar", "server.jar", "-nogui"],
+      {
+        cwd: process.env.MC_DIR,
+      }
+    );
+    if (this.process) {
+      this.process.stdout?.on("data", (data: any) => {
+        console.log(`[MCS]: ${data}`);
+      });
+      this.process.stderr?.on("data", (data: any) => {
+        console.error(`${data}`);
+        this.process?.kill("SIGINT");
+        this.process = undefined;
+      });
+    }
+  }
+  /**
+   * Kill the current running server.
+   */
+  killServer() {
+    if (this.process) {
+      this.process.kill("SIGINT");
+      this.process = undefined;
+    }
+  }
+
   /**
    * Start the Minecraft server.
    * @returns a boolean showing the state of the server.
@@ -33,22 +69,14 @@ export class Server {
           parseInt(process.env.SERVER_START_INTERVAL!)
         );
 
-        childProcess.execFile(
-          path.join(rootPath, "bin\\mc-server.bat"),
-          function (error, stdout, stderr) {
-            if (error) {
-              console.error(error);
-            }
-          }
-        );
+        this.spawnServer();
 
-        console.log("[MCS]: Run the server start bat file");
         connection = ServerStatus.Starting;
       }
     } catch (error) {
       console.log(error);
+      this.disconnect();
     }
-    console.log(`[MCS]: Start function result: ${connection}`);
     return connection;
   }
 
@@ -73,7 +101,7 @@ export class Server {
   async stop(): Promise<ServerStatus> {
     let connection = await this.status();
     try {
-      if (connection == ServerStatus.Online && this.players == 0) {
+      if (connection == ServerStatus.Online) {
         this.starting = true;
         setTimeout(
           () => (this.starting = false),
@@ -85,14 +113,12 @@ export class Server {
           await this.disconnect();
         }
 
-        console.log(`[MCS]: Stop command response: ${response}`);
         connection = ServerStatus.Starting;
       }
     } catch (error) {
       console.log(error);
       await this.disconnect();
     }
-    console.log(`[MCS]: Stop function result: ${connection}`);
     return connection;
   }
   /**
@@ -111,19 +137,16 @@ export class Server {
       }
       let response = await this.rcon.send("list");
       if (response) {
-        let pos = response.match(/[0-9]+/)!.index;
-        this.players = parseInt(
-          response.substring(pos!, response.indexOf(" ", pos))
-        );
+        this.players = response
+          .substring(response.indexOf(":") + 1)
+          .split(" ")
+          .filter((value) => value.length);
       }
     } catch (error) {
       console.log(error);
       this.rcon = undefined;
-      this.players = 0;
+      this.players = undefined;
     }
-    console.log(
-      `[MCS]: Testing connection result: ${this.rcon}, player: ${this.players}`
-    );
     return this.rcon;
   }
   /**
@@ -138,7 +161,8 @@ export class Server {
       console.log(error);
     }
     this.rcon = undefined;
-    this.players = 0;
+    this.players = undefined;
+    this.killServer();
   }
 }
 

@@ -226,7 +226,7 @@ async function execute(interaction: ChatInputCommandInteraction) {
     switch (subcommand) {
       case Subcommand.Add: {
         const url = interaction.options.getString("url");
-        const reply = await player.add(url, interaction.channel!);
+        const reply = await player.add(url);
         await interaction.editReply(createMessage(reply, url));
         break;
       }

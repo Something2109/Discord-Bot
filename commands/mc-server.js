@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const Server = require('../utils/Server');
 const Ngrok = require('../utils/Ngrok');
+const { createMessage } = require('../utils/utils');
 
 const data = new SlashCommandBuilder()
     .setName('mc-server')
@@ -36,29 +37,29 @@ const reply = {
         status: "Server is starting or stopping"
     },
     get(subcommand, status, tunnel) {
-        let serverReply = this.starting[subcommand];
-        let ngrokReply = `Ngrok is not running`;
+        let serverReply = {
+            name: "Minecraft server:",
+            value: this.starting[subcommand]
+        };
 
         if (status) {
-            serverReply = this.on[subcommand];
+            serverReply.value = this.on[subcommand];
         } else if (status === false) {
-            serverReply = this.off[subcommand];
+            serverReply.value = this.off[subcommand];
         }
 
-        if (tunnel) {
-            ngrokReply = `Ngrok running at ${tunnel.public_url}`;
-        }
-
-        return {
-            color: 0x0099ff,
-            title: `Command ${subcommand}:`,
-            fields: [{
-                name: "Minecraft server:",
-                value: serverReply
-            }, {
-                name: "Ngrok:", value: ngrokReply
-            }],
+        let ngrokReply = {
+            name: "Ngrok:",
+            value: tunnel ?
+                `Ngrok running at ${tunnel.public_url}` :
+                `Ngrok is not running`
         };
+
+        return createMessage({
+            message: `Command ${subcommand}:`,
+            field: [serverReply, ngrokReply],
+            actionRow: buttons.get(status)
+        });
     }
 }
 
@@ -121,14 +122,13 @@ function testConnection(interaction, onSuccess, onFail, status) {
                 remainTestTime--;
             } else {
                 let buttonRow = buttons.get(res);
-                interaction.followUp({
-                    embeds: [{
-                        color: 0x0099ff,
-                        title: "Testing connection",
+                interaction.followUp(
+                    createMessage({
+                        message: "Testing connection",
                         description: (res === status) ? onSuccess : onFail,
-                    }],
-                    components: (buttonRow) ? [buttonRow] : []
-                }).then(message => previousMsg = message);
+                        actionRow: buttonRow
+                    })
+                ).then(message => previousMsg = message);
                 clearInterval(connectionTest);
             }
         })
@@ -150,12 +150,8 @@ module.exports = {
         let [status, tunnel] = await Promise.all([
             Server[subcommand](), Ngrok[subcommand]()
         ])
-        let buttonRow = buttons.get(status);
 
-        previousMsg = await interaction.editReply({
-            embeds: [reply.get(subcommand, status, tunnel)],
-            components: (buttonRow) ? [buttonRow] : []
-        });
+        previousMsg = await interaction.editReply(reply.get(subcommand, status, tunnel));
 
         if ((subcommand == 'start' || subcommand == 'stop') && status == undefined) {
             testConnection(interaction,

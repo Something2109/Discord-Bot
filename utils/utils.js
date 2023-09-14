@@ -62,8 +62,34 @@ function initEvent(client) {
     }
 }
 
+/**
+ * Create the message to send to the discord channel.
+ * @param message The message string to send.
+ * @param url The optional url of the message.
+ * @param showQueue The indicator to show the music queue in the message.
+ * @returns The message object to send.
+ */
+function createMessage({
+    message, url = undefined,
+    description = undefined,
+    field = [], actionRow = undefined
+}) {
+    const embed = {
+        color: 0x0099ff,
+        title: message,
+        url,
+        description,
+        fields: field,
+    };
+    return {
+        embeds: [embed],
+        components: (actionRow) ? [actionRow] : []
+    };
+}
+
 module.exports = {
     readCommands,
     refreshCommands,
-    initEvent
+    initEvent,
+    createMessage
 };

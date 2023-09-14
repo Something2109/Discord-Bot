@@ -14,15 +14,14 @@ class Player {
             })
             .on('error', error => {
                 console.error(`Audio Player Error: ${error} with resources`);
-                sendUpdateMessage(`Cannot play ${this.#playing.title}`);
+                sendUpdateMessage({ message: `Cannot play ${this.#playing.title}` });
             })
             .on(AudioPlayerStatus.Playing, () => {
-                sendUpdateMessage(
-                    `Playing ${this.#playing.title}`,
-                    this.#playing.url,
-                    undefined,
-                    this.list()
-                )
+                sendUpdateMessage({
+                    message: `Playing ${this.#playing.title}`,
+                    url: this.#playing.url,
+                    field: this.list()
+                })
             })
             .on(AudioPlayerStatus.Idle, () => {
                 if (this.#loop) {
@@ -177,11 +176,9 @@ class Player {
      * @returns The reply string.
      */
     pause() {
-        let reply = "Failed to pause the player";
-        if (this.#player.pause()) {
-            reply = "Paused the player";
-        }
-        return reply;
+        return this.#player.pause() ?
+            "Paused the player" :
+            "Failed to pause the player";
     }
 
     /**
@@ -189,11 +186,9 @@ class Player {
      * @returns The reply string.
      */
     unpause() {
-        let reply = "Failed to unpause the player";
-        if (this.#player.unpause()) {
-            reply = "Unpaused the player";
-        }
-        return reply;
+        return this.#player.unpause() ?
+            "Unpaused the player" :
+            "Failed to unpause the player";
     }
 }
 

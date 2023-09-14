@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
 const Player = require('../utils/Player');
+const { createMessage } = require('../utils/utils');
 
 const data = new SlashCommandBuilder()
     .setName('music')
@@ -46,28 +47,8 @@ let connection = undefined;
 let subscription = undefined;
 let updateChannel = undefined;
 
-/**
- * Create the message to send to the discord channel.
- * @param message The message string to send.
- * @param url The optional url of the message.
- * @param showQueue The indicator to show the music queue in the message.
- * @returns The message object to send.
- */
-function createMessage(message, url, description, field) {
-    const embed = {
-        color: 0x0099ff,
-        title: message,
-        url,
-        description,
-        fields: field,
-    };
-    return {
-        embeds: [embed],
-    };
-}
-
-function sendUpdateMessage(message, url, description, field) {
-    updateChannel.send(createMessage(message, url, description, field));
+function sendUpdateMessage({ message, url = undefined, description = undefined, field = undefined }) {
+    updateChannel.send(createMessage({ message, url, description, field }));
 };
 
 /**
@@ -151,28 +132,28 @@ async function execute(interaction) {
             case 'add': {
                 const url = interaction.options.getString('url');
                 const reply = await player.add(url);
-                await interaction.editReply(createMessage(reply, url));
+                await interaction.editReply(createMessage({ message: reply, url }));
                 break;
             }
             case 'remove': {
                 const number = interaction.options.getNumber('number');
                 const reply = player.remove(number);
-                await interaction.editReply(createMessage(reply));
+                await interaction.editReply(createMessage({ message: reply }));
                 break;
             }
             case 'list': {
                 const reply = "List of songs in the queue";
                 const queue = player.list();
-                await interaction.editReply(createMessage(reply, null, null, queue));
+                await interaction.editReply(createMessage({ message: reply, field: queue }));
                 break;
             }
             case 'leave': {
                 const reply = await leave();
-                await interaction.editReply(createMessage(reply));
+                await interaction.editReply(createMessage({ message: reply }));
                 break;
             }
             default: {
-                await interaction.editReply(createMessage(player[subcommand]()));
+                await interaction.editReply(createMessage({ message: player[subcommand]() }));
             }
         }
     }

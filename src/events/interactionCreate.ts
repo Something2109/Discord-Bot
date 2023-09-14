@@ -1,4 +1,5 @@
 import { Events, BaseInteraction } from "discord.js";
+import { CustomClient } from "../utils/utils";
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -11,10 +12,11 @@ module.exports = {
       [commandName] = interaction.customId.split(" ");
     }
 
-    let command = interaction.client.commands.get(commandName);
+    const client = interaction.client as CustomClient;
+    let command = client.getCommand(commandName);
 
     try {
-      await command.execute(interaction);
+      await command?.execute(interaction);
     } catch (error) {
       console.error(`Error executing ${commandName}`);
       console.error(error);

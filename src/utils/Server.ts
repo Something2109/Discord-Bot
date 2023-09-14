@@ -1,7 +1,6 @@
 import { Rcon } from "rcon-client";
 import { ChildProcess, spawn } from "child_process";
-import path from "node:path";
-const rootPath = path.dirname(path.dirname(__filename));
+import { APIEmbedField } from "discord.js";
 
 /**
  * Minecraft server object used to control the minecraft server throught rcon.
@@ -49,10 +48,8 @@ export class Server {
    * Kill the current running server.
    */
   killServer() {
-    if (this.process) {
-      this.process.kill("SIGINT");
-      this.process = undefined;
-    }
+    this.process?.kill("SIGINT");
+    this.process = undefined;
   }
 
   /**
@@ -154,9 +151,7 @@ export class Server {
    */
   async disconnect(): Promise<void> {
     try {
-      if (this.rcon) {
-        await this.rcon.end();
-      }
+      await this.rcon?.end();
     } catch (error) {
       console.log(error);
     }

@@ -4,7 +4,7 @@ import {
   createAudioResource,
   AudioPlayerStatus,
 } from "@discordjs/voice";
-import { APIEmbedField, TextBasedChannel } from "discord.js";
+import { APIEmbedField } from "discord.js";
 import ytdl from "ytdl-core";
 
 interface AudioInfo {
@@ -16,16 +16,16 @@ interface AudioInfo {
 export interface UpdateMessageSender {
   (
     message: string,
-    url: string | null,
-    description: string | null,
-    field: Array<APIEmbedField>
+    url?: string | undefined,
+    description?: string | undefined,
+    field?: Array<APIEmbedField>
   ): void;
 }
 
 export class Player {
   private _audioPlayer: AudioPlayer;
   private loop: boolean;
-  private playing: AudioInfo | undefined;
+  private playing?: AudioInfo;
   private queue: Array<AudioInfo>;
 
   constructor(sendUpdateMessage: UpdateMessageSender) {
@@ -37,14 +37,9 @@ export class Player {
       })
       .on("error", (error) => {
         console.error(`Audio Player Error: ${error.message} with resources`);
-        if (this.playing) {
-          sendUpdateMessage(
-            `Error when playing ${this.playing.title}: ${error.message}`,
-            null,
-            null,
-            []
-          );
-        }
+        sendUpdateMessage(
+          `Error when playing ${this.playing?.title}: ${error.message}`
+        );
       })
       .on(AudioPlayerStatus.Idle, () => {
         if (this.loop) {
@@ -55,14 +50,12 @@ export class Player {
         }
       })
       .on(AudioPlayerStatus.Playing, () => {
-        if (this.playing) {
-          sendUpdateMessage(
-            `Playing ${this.playing.title}`,
-            this.playing.url,
-            null,
-            this.list()
-          );
-        }
+        sendUpdateMessage(
+          `Playing ${this.playing?.title}`,
+          this.playing?.url,
+          undefined,
+          this.list()
+        );
       });
     this.loop = false;
     this.playing = undefined;
@@ -91,20 +84,18 @@ export class Player {
    * @returns The input url of undefined if not.
    */
   private validateUrl(url: string | null): string | undefined {
-    if (url) {
-      let regExp =
-        /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
-      let regExp2 =
-        /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\?v=)([^#\&\?]*).*/;
-      if (url.match(regExp) || url.match(regExp2)) {
-        return url;
-      }
+    let regExp =
+      /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
+    let regExp2 =
+      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\?v=)([^#\&\?]*).*/;
+    if (url?.match(regExp) || url?.match(regExp2)) {
+      return url;
     }
     return undefined;
   }
 
   private async getVideoInfo(url: string): Promise<AudioInfo> {
-    const info: ytdl.videoInfo = await ytdl.getBasicInfo(url!);
+    const info: ytdl.videoInfo = await ytdl.getBasicInfo(url);
     return {
       url,
       title: info.videoDetails.title,
@@ -215,11 +206,9 @@ export class Player {
    * @returns The reply string.
    */
   public pause(): string {
-    let reply = "Failed to pause the player";
-    if (this._audioPlayer.pause()) {
-      reply = "Paused the player";
-    }
-    return reply;
+    return this._audioPlayer.pause()
+      ? "Paused the player"
+      : "Failed to pause the player";
   }
 
   /**
@@ -227,10 +216,8 @@ export class Player {
    * @returns The reply string.
    */
   public unpause(): string {
-    let reply = "Failed to unpause the player";
-    if (this._audioPlayer.unpause()) {
-      reply = "Unpaused the player";
-    }
-    return reply;
+    return this._audioPlayer.unpause()
+      ? "Unpaused the player"
+      : "Failed to unpause the player";
   }
 }

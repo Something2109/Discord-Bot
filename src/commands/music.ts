@@ -1,7 +1,7 @@
 import {
   APIEmbedField,
   ChatInputCommandInteraction,
-  Embed,
+  GuildMember,
   SlashCommandBuilder,
   TextBasedChannel,
   VoiceBasedChannel,
@@ -14,6 +14,7 @@ import {
   VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { Player, UpdateMessageSender } from "../utils/Player";
+import { createMessage } from "../utils/utils";
 
 enum Subcommand {
   Add = "add",
@@ -84,40 +85,13 @@ const data = new SlashCommandBuilder()
 
 let updateChannel: TextBasedChannel | undefined = undefined;
 
-/**
- * Create the message to send to the discord channel.
- * @param message The message string to send.
- * @param url The optional url of the message.
- * @param showQueue The indicator to show the music queue in the message.
- * @returns The message object to send.
- */
-function createMessage(
-  message: string,
-  url: string | null = null,
-  description: string | null = null,
-  field: Array<APIEmbedField> = []
-) {
-  const embed: Embed = {
-    color: 0x0099ff,
-    title: message,
-    url,
-    description,
-    fields: field,
-  };
-  return {
-    embeds: [embed],
-  };
-}
-
 const sendUpdateMessage: UpdateMessageSender = (
   message: string,
-  url: string | null = null,
-  description: string | null = null,
+  url: string | undefined = undefined,
+  description: string | undefined = undefined,
   field: Array<APIEmbedField> = []
 ) => {
-  if (updateChannel) {
-    updateChannel.send(createMessage(message, url, description, field));
-  }
+  updateChannel?.send(createMessage(message, url, description, field));
 };
 
 const player = new Player(sendUpdateMessage);
@@ -142,16 +116,14 @@ function joinVoice(channel: VoiceBasedChannel) {
   connection.on(
     VoiceConnectionStatus.Disconnected,
     async (oldState, newState) => {
-      if (connection) {
-        try {
-          await Promise.race([
-            entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-            entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
-          ]);
-        } catch (error) {
-          console.log(error);
-          await leave();
-        }
+      try {
+        await Promise.race([
+          entersState(connection!, VoiceConnectionStatus.Signalling, 5_000),
+          entersState(connection!, VoiceConnectionStatus.Connecting, 5_000),
+        ]);
+      } catch (error) {
+        console.log(error);
+        await leave();
       }
     }
   );
@@ -169,25 +141,21 @@ function joinVoice(channel: VoiceBasedChannel) {
 async function connect(
   interaction: ChatInputCommandInteraction
 ): Promise<boolean> {
-  if (interaction.member) {
-    const userVoiceChannel = interaction.member.voice.channel;
-    if (!userVoiceChannel) {
-      await interaction.reply(
-        "You need to join a voice channel to play the music"
-      );
-    } else {
-      if (!connection) {
-        joinVoice(userVoiceChannel);
-      } else if (
-        subscription &&
-        userVoiceChannel.id !== connection.joinConfig.channelId
-      ) {
-        subscription.unsubscribe();
-        connection.destroy();
-        joinVoice(userVoiceChannel);
-      }
-      return true;
+  const member = interaction.member as GuildMember;
+  const userVoiceChannel = member.voice.channel;
+  if (!userVoiceChannel) {
+    await interaction.editReply(
+      createMessage("You need to join a voice channel to play the music")
+    );
+  } else {
+    if (!connection) {
+      joinVoice(userVoiceChannel);
+    } else if (userVoiceChannel.id !== connection.joinConfig.channelId) {
+      subscription?.unsubscribe();
+      connection.destroy();
+      joinVoice(userVoiceChannel);
     }
+    return true;
   }
   return false;
 }
@@ -199,15 +167,11 @@ async function connect(
  */
 async function leave() {
   player.stop();
-  if (subscription) {
-    subscription.unsubscribe();
-    subscription = undefined;
-  }
+  subscription?.unsubscribe();
+  subscription = undefined;
 
-  if (connection) {
-    connection.destroy();
-    connection = undefined;
-  }
+  connection?.destroy();
+  connection = undefined;
 
   return "Left the voice channel";
 }
@@ -227,7 +191,9 @@ async function execute(interaction: ChatInputCommandInteraction) {
       case Subcommand.Add: {
         const url = interaction.options.getString("url");
         const reply = await player.add(url);
-        await interaction.editReply(createMessage(reply, url));
+        await interaction.editReply(
+          createMessage(reply, url ? url : undefined)
+        );
         break;
       }
       case Subcommand.Remove: {
@@ -239,7 +205,9 @@ async function execute(interaction: ChatInputCommandInteraction) {
       case Subcommand.List: {
         const reply = "List of songs in the queue";
         const queue = player.list();
-        await interaction.editReply(createMessage(reply, null, null, queue));
+        await interaction.editReply(
+          createMessage(reply, undefined, undefined, queue)
+        );
         break;
       }
       case Subcommand.Leave: {
@@ -254,7 +222,4 @@ async function execute(interaction: ChatInputCommandInteraction) {
   }
 }
 
-module.exports = {
-  data: data,
-  execute,
-};
+export { data, execute };

@@ -20,11 +20,9 @@ module.exports = {
   async execute(interaction: ChatInputCommandInteraction) {
     if (interaction.options.getSubcommand() === "user") {
       const target = interaction.options.getUser("target");
-      if (!target) {
-        await interaction.reply(`Go fuck yourself, ${interaction.user}`);
-      } else {
-        await interaction.reply(`Fuck ${target}`);
-      }
+      target
+        ? await interaction.reply(`Fuck ${target}`)
+        : await interaction.reply(`Go fuck yourself, ${interaction.user}`);
     } else {
       await interaction.reply(`Fuck ${interaction.guild!.name}`);
     }

@@ -6,9 +6,13 @@ import {
   Message,
   ChatInputCommandInteraction,
   ButtonInteraction,
+  BaseMessageOptions,
+  APIEmbedField,
+  ActionRowBuilder,
 } from "discord.js";
 import { Server, ServerStatus } from "../utils/Server";
 import { Ngrok, NgrokTunnel } from "../utils/Ngrok";
+import { createMessage } from "../utils/utils";
 
 enum Subcommand {
   Start = "start",
@@ -128,29 +132,46 @@ function getReply(
   subcommand: Subcommand,
   status: ServerStatus,
   tunnel: NgrokTunnel | undefined
-) {
-  let serverReply = reply[subcommand][status];
-  let ngrokReply = `Ngrok is not running`;
-
-  if (tunnel) {
-    ngrokReply = `Ngrok running at ${tunnel.public_url}`;
-  }
-
-  return {
-    embeds: [
-      {
-        color: 0x0099ff,
-        title: `Command ${subcommand}:`,
-        fields: [
-          {
-            name: "Minecraft server:",
-            value: serverReply,
-          },
-          { name: "Ngrok", value: ngrokReply },
-        ],
-      },
-    ],
+): BaseMessageOptions {
+  let serverReply: APIEmbedField = {
+    name: "Minecraft server:",
+    value: reply[subcommand][status],
   };
+  let ngrokReply: APIEmbedField = {
+    name: "Ngrok",
+    value: tunnel
+      ? `Ngrok running at ${tunnel.public_url}`
+      : `Ngrok is not running`,
+  };
+
+  return createMessage(
+    `Command ${subcommand}:`,
+    undefined,
+    undefined,
+    [serverReply, ngrokReply],
+    getButton(status)
+  );
+}
+
+/**
+ * Create the button row based on the status of the server.
+ * @param status Current status of the server.
+ * @returns The action row contains the buttons.
+ */
+function getButton(status: ServerStatus): ActionRowBuilder | undefined {
+  if (status == ServerStatus.Online) {
+    return new ActionRowBuilder().addComponents(
+      buttons[Subcommand.Status],
+      buttons[Subcommand.Stop]
+    );
+  } else if (status == ServerStatus.Offline) {
+    return new ActionRowBuilder().addComponents(
+      buttons[Subcommand.Start],
+      buttons[Subcommand.Status]
+    );
+  } else {
+    return undefined;
+  }
 }
 
 /**
@@ -173,15 +194,15 @@ function testConnection(
         remainTestTime--;
       } else {
         interaction
-          .followUp({
-            embeds: [
-              {
-                color: 0x0099ff,
-                title: "Test connection:",
-                description: res === status ? onSuccess : onFail,
-              },
-            ],
-          })
+          .followUp(
+            createMessage(
+              "Test connection:",
+              undefined,
+              res === status ? onSuccess : onFail,
+              undefined,
+              getButton(res)
+            )
+          )
           .then((message) => (previousMsg = message));
         clearInterval(connectionTest);
       }
@@ -192,11 +213,9 @@ function testConnection(
 async function execute(
   interaction: ChatInputCommandInteraction | ButtonInteraction
 ) {
-  if (previousMsg) {
-    await previousMsg.edit({
-      components: [],
-    });
-  }
+  await previousMsg?.edit({
+    components: [],
+  });
 
   await interaction.deferReply();
 

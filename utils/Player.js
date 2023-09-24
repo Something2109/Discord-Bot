@@ -3,7 +3,7 @@ const ytdl = require('ytdl-core');
 
 class Player {
     #player;
-    #loop;
+    #looping;
     #playing;
     #queue;
 
@@ -24,7 +24,7 @@ class Player {
                 })
             })
             .on(AudioPlayerStatus.Idle, () => {
-                if (this.#loop) {
+                if (this.#looping) {
                     this.#play();
                 }
                 else {
@@ -32,7 +32,7 @@ class Player {
                     this.#play();
                 }
             });
-        this.#loop = false;
+        this.#looping = false;
         this.#playing = undefined;
         this.#queue = [];
     }
@@ -139,6 +139,7 @@ class Player {
     stop() {
         this.clearqueue();
         this.#player.stop(true);
+        this.#playing = undefined;
         return "Music stopped";
     }
 
@@ -189,6 +190,24 @@ class Player {
         return this.#player.unpause() ?
             "Unpaused the player" :
             "Failed to unpause the player";
+    }
+
+    /**
+     * Make the player starts playing loop.
+     * @returns The reply string.
+     */
+    loop() {
+        this.#looping = true;
+        return "Start playing loop";
+    }
+
+    /**
+     * Make the player stops playing loop.
+     * @returns The reply string.
+     */
+    unloop() {
+        this.#looping = false;
+        return "Stop playing loop";
     }
 }
 

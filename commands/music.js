@@ -40,7 +40,13 @@ const data = new SlashCommandBuilder()
             .setDescription('Pause the player'))
     .addSubcommand(subcommand =>
         subcommand.setName('unpause')
-            .setDescription('Unpause the player to leave channel'));
+            .setDescription('Unpause the player to leave channel'))
+    .addSubcommand(subcommand =>
+        subcommand.setName('loop')
+            .setDescription('Loop the playing song'))
+    .addSubcommand(subcommand =>
+        subcommand.setName('unloop')
+            .setDescription('Continue to play the next song in the queue'));
 
 const player = new Player(sendUpdateMessage);
 let connection = undefined;

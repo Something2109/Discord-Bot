@@ -92,6 +92,14 @@ class CustomClient extends Client {
   }
 }
 
+export interface MessageAPI {
+  title: string;
+  url?: string;
+  description?: string;
+  field?: Array<APIEmbedField>;
+  actionRow?: any;
+}
+
 /**
  * Create the message to send to the discord channel.
  * @param message The message string to send.
@@ -99,23 +107,17 @@ class CustomClient extends Client {
  * @param showQueue The indicator to show the music queue in the message.
  * @returns The message object to send.
  */
-function createMessage(
-  message: string,
-  url?: string,
-  description?: string,
-  field?: Array<APIEmbedField>,
-  actionRow?: any
-): BaseMessageOptions {
+function createMessage(message: MessageAPI): BaseMessageOptions {
   const embed: APIEmbed = {
     color: 0x0099ff,
-    title: message,
-    url,
-    description,
-    fields: field,
+    title: message.title,
+    url: message.url,
+    description: message.description,
+    fields: message.field,
   };
   return {
     embeds: [embed],
-    components: actionRow ? [actionRow] : [],
+    components: message.actionRow ? [message.actionRow] : [],
   };
 }
 

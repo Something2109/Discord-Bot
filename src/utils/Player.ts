@@ -29,9 +29,9 @@ export class Player {
       })
       .on("error", (error) => {
         console.error(`Audio Player Error: ${error.message} with resources`);
-        updater.send(
-          `Error when playing ${this.playing?.title}: ${error.message}`
-        );
+        updater.send({
+          title: `Error when playing ${this.playing?.title}: ${error.message}`,
+        });
       })
       .on(AudioPlayerStatus.Idle, () => {
         if (this.looping) {
@@ -42,12 +42,11 @@ export class Player {
         }
       })
       .on(AudioPlayerStatus.Playing, () => {
-        updater.send(
-          `Playing ${this.playing?.title}`,
-          this.playing?.url,
-          undefined,
-          this.list()
-        );
+        updater.send({
+          title: `Playing ${this.playing?.title}`,
+          url: this.playing?.url,
+          field: this.list(),
+        });
       });
     this.looping = false;
     this.playing = undefined;
@@ -160,8 +159,8 @@ export class Player {
    */
   public stop(): string {
     this.clearqueue();
-    this._audioPlayer.stop(true);
     this.playing = undefined;
+    this._audioPlayer.stop(true);
     return "Music stopped";
   }
 

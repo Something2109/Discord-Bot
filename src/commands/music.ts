@@ -1,5 +1,5 @@
 import {
-  APIEmbedField,
+  BaseMessageOptions,
   ChatInputCommandInteraction,
   GuildMember,
   SlashCommandBuilder,
@@ -17,6 +17,8 @@ import { Updater } from "../utils/Updater";
 import { Player } from "../utils/Player";
 import { createMessage } from "../utils/utils";
 
+type InteractionType = ChatInputCommandInteraction;
+
 enum Subcommand {
   Add = "add",
   Remove = "remove",
@@ -31,13 +33,27 @@ enum Subcommand {
   Unloop = "unloop",
 }
 
+const description: { [key in Subcommand]: string } = {
+  [Subcommand.Add]: "Add a song to the player queue",
+  [Subcommand.Remove]: "Remove the specified song from the queue",
+  [Subcommand.Leave]: "Force the player to leave channel",
+  [Subcommand.Skip]: "Skip to the next songs in the queue",
+  [Subcommand.Stop]: "Stop the player",
+  [Subcommand.List]: "List the songs in the player queue",
+  [Subcommand.ClearQueue]: "Clear the player queue",
+  [Subcommand.Pause]: "Pause the player",
+  [Subcommand.Unpause]: "Unpause the player",
+  [Subcommand.Loop]: "Loop the playing song",
+  [Subcommand.Unloop]: "Continue to play the next song in the queue",
+};
+
 const data = new SlashCommandBuilder()
   .setName("music")
   .setDescription("Play music")
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.Add)
-      .setDescription("Add a song to the player queue")
+      .setDescription(description[Subcommand.Add])
       .addStringOption((option) =>
         option
           .setName("url")
@@ -48,7 +64,7 @@ const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.Remove)
-      .setDescription("Remove the specified song from the queue")
+      .setDescription(description[Subcommand.Remove])
       .addNumberOption((option) =>
         option
           .setName("number")
@@ -59,39 +75,47 @@ const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.Leave)
-      .setDescription("Force the player to leave channel")
+      .setDescription(description[Subcommand.Leave])
   )
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.Skip)
-      .setDescription("Skip to the next songs in the queue")
+      .setDescription(description[Subcommand.Skip])
   )
   .addSubcommand((subcommand) =>
-    subcommand.setName(Subcommand.Stop).setDescription("Stop the player")
+    subcommand
+      .setName(Subcommand.Stop)
+      .setDescription(description[Subcommand.Stop])
   )
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.List)
-      .setDescription("List the songs in the player queue")
+      .setDescription(description[Subcommand.List])
   )
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.ClearQueue)
-      .setDescription("Clear the player queue")
+      .setDescription(description[Subcommand.ClearQueue])
   )
   .addSubcommand((subcommand) =>
-    subcommand.setName(Subcommand.Pause).setDescription("Pause the player")
+    subcommand
+      .setName(Subcommand.Pause)
+      .setDescription(description[Subcommand.Pause])
   )
   .addSubcommand((subcommand) =>
-    subcommand.setName(Subcommand.Unpause).setDescription("Unpause the player")
+    subcommand
+      .setName(Subcommand.Unpause)
+      .setDescription(description[Subcommand.Unpause])
   )
   .addSubcommand((subcommand) =>
-    subcommand.setName(Subcommand.Loop).setDescription("Loop the playing song")
+    subcommand
+      .setName(Subcommand.Loop)
+      .setDescription(description[Subcommand.Loop])
   )
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.Unloop)
-      .setDescription("Continue to play the next song in the queue")
+      .setDescription(description[Subcommand.Unloop])
   );
 
 const updater = new Updater();
@@ -139,14 +163,14 @@ function joinVoice(channel: VoiceBasedChannel) {
  * @param interaction The interaction command.
  * @returns True if the user has voice connection else false.
  */
-async function connect(
-  interaction: ChatInputCommandInteraction
-): Promise<boolean> {
+async function connect(interaction: InteractionType): Promise<boolean> {
   const member = interaction.member as GuildMember;
   const userVoiceChannel = member.voice.channel;
   if (!userVoiceChannel) {
     await interaction.editReply(
-      createMessage("You need to join a voice channel to play the music")
+      createMessage({
+        title: "You need to join a voice channel to play the music",
+      })
     );
   } else {
     if (!connection) {
@@ -177,49 +201,66 @@ async function leave() {
   return "Left the voice channel";
 }
 
+const executor: {
+  [key in Subcommand]: (
+    interaction: InteractionType
+  ) => Promise<BaseMessageOptions>;
+} = {
+  [Subcommand.Add]: async (interaction) => {
+    const url = interaction.options.getString("url");
+    const reply = await player.add(url);
+    return createMessage({ title: reply, url: url ? url : undefined });
+  },
+  [Subcommand.Remove]: async (interaction) => {
+    const number = interaction.options.getNumber("number");
+    const reply = player.remove(number!);
+    return createMessage({ title: reply });
+  },
+  [Subcommand.Leave]: async (interaction) => {
+    let reply = await leave();
+    return createMessage({ title: reply });
+  },
+  [Subcommand.Skip]: async (interaction) => {
+    return createMessage({ title: player[Subcommand.Skip]() });
+  },
+  [Subcommand.Stop]: async (interaction) => {
+    return createMessage({ title: player[Subcommand.Stop]() });
+  },
+  [Subcommand.List]: async (interaction) => {
+    const reply = "List of songs in the queue";
+    const queue = player.list();
+    return createMessage({ title: reply, field: queue });
+  },
+  [Subcommand.ClearQueue]: async (interaction) => {
+    return createMessage({ title: player[Subcommand.ClearQueue]() });
+  },
+  [Subcommand.Pause]: async (interaction) => {
+    return createMessage({ title: player[Subcommand.Pause]() });
+  },
+  [Subcommand.Unpause]: async (interaction) => {
+    return createMessage({ title: player[Subcommand.Unpause]() });
+  },
+  [Subcommand.Loop]: async (interaction) => {
+    return createMessage({ title: player[Subcommand.Loop]() });
+  },
+  [Subcommand.Unloop]: async (interaction) => {
+    return createMessage({ title: player[Subcommand.Unloop]() });
+  },
+};
+
 /**
  * The main executioner of this command.
  * @param interaction The interaction object.
  */
-async function execute(interaction: ChatInputCommandInteraction) {
+async function execute(interaction: InteractionType) {
   let subcommand = interaction.options.getSubcommand() as Subcommand;
   updater.channel = interaction.channel as TextBasedChannel;
 
   await interaction.deferReply();
   const status = await connect(interaction);
   if (status) {
-    switch (subcommand) {
-      case Subcommand.Add: {
-        const url = interaction.options.getString("url");
-        const reply = await player.add(url);
-        await interaction.editReply(
-          createMessage(reply, url ? url : undefined)
-        );
-        break;
-      }
-      case Subcommand.Remove: {
-        const number = interaction.options.getNumber("number");
-        const reply = player.remove(number!);
-        await interaction.editReply(createMessage(reply));
-        break;
-      }
-      case Subcommand.List: {
-        const reply = "List of songs in the queue";
-        const queue = player.list();
-        await interaction.editReply(
-          createMessage(reply, undefined, undefined, queue)
-        );
-        break;
-      }
-      case Subcommand.Leave: {
-        let reply = await leave();
-        await interaction.editReply(createMessage(reply));
-        break;
-      }
-      default: {
-        await interaction.editReply(createMessage(player[subcommand]()));
-      }
-    }
+    const message = await executor[subcommand](interaction);
+    await interaction.editReply(message);
   }
 }
 

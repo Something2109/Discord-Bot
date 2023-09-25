@@ -14,11 +14,19 @@ import { Server, ServerStatus } from "../utils/Server";
 import { Ngrok, NgrokTunnel } from "../utils/Ngrok";
 import { createMessage } from "../utils/utils";
 
+type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
+
 enum Subcommand {
   Start = "start",
   Stop = "stop",
   Status = "status",
 }
+
+const description: { [key in Subcommand]: string } = {
+  [Subcommand.Start]: "Start the minecraft server",
+  [Subcommand.Stop]: "Stop the minecraft server",
+  [Subcommand.Status]: "Show the status of the minecraft server",
+};
 
 const reply: { [key in Subcommand]: { [key in ServerStatus]: string } } = {
   [Subcommand.Start]: {
@@ -44,17 +52,17 @@ const data = new SlashCommandBuilder()
   .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
     subcommand
       .setName(Subcommand.Start)
-      .setDescription("Start the minecraft server")
+      .setDescription(description[Subcommand.Start])
   )
   .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
     subcommand
       .setName(Subcommand.Stop)
-      .setDescription("Stop the minecraft server")
+      .setDescription(description[Subcommand.Stop])
   )
   .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
     subcommand
       .setName(Subcommand.Status)
-      .setDescription("Show the status of the minecraft server")
+      .setDescription(description[Subcommand.Status])
   );
 
 const buttons = {
@@ -81,9 +89,7 @@ const ngrok = new Ngrok();
  * @param interaction
  * @returns The needed subcommand.
  */
-function getSubcommand(
-  interaction: ChatInputCommandInteraction | ButtonInteraction
-): Subcommand {
+function getSubcommand(interaction: InteractionType): Subcommand {
   let subcommand: string = Subcommand.Status;
   if (interaction.isChatInputCommand()) {
     subcommand = interaction.options.getSubcommand();
@@ -92,33 +98,6 @@ function getSubcommand(
   }
   console.log(`[CMD]: Executing command mc-server ${subcommand}`);
   return subcommand as Subcommand;
-}
-
-/**
- * Execute the command to the server and Ngrok.
- * @param subcommand The subcommand of the interaction.
- * @returns The result of the command to the server and Ngrok.
- */
-async function executeSubcommand(
-  subcommand: string | undefined
-): Promise<{ status: ServerStatus; tunnel: NgrokTunnel | undefined }> {
-  let status = ServerStatus.Starting;
-  let tunnel = undefined;
-  switch (subcommand) {
-    case Subcommand.Start: {
-      [status, tunnel] = await Promise.all([server.start(), ngrok.start()]);
-      break;
-    }
-    case Subcommand.Status: {
-      [status, tunnel] = await Promise.all([server.status(), ngrok.status()]);
-      break;
-    }
-    case Subcommand.Stop: {
-      [status, tunnel] = await Promise.all([server.stop(), ngrok.stop()]);
-      break;
-    }
-  }
-  return { status, tunnel };
 }
 
 /**
@@ -131,7 +110,7 @@ async function executeSubcommand(
 function getReply(
   subcommand: Subcommand,
   status: ServerStatus,
-  tunnel: NgrokTunnel | undefined
+  tunnel?: NgrokTunnel
 ): BaseMessageOptions {
   let serverReply: APIEmbedField = {
     name: "Minecraft server:",
@@ -144,13 +123,11 @@ function getReply(
       : `Ngrok is not running`,
   };
 
-  return createMessage(
-    `Command ${subcommand}:`,
-    undefined,
-    undefined,
-    [serverReply, ngrokReply],
-    getButton(status)
-  );
+  return createMessage({
+    title: `Command ${subcommand}:`,
+    field: [serverReply, ngrokReply],
+    actionRow: getButton(status),
+  });
 }
 
 /**
@@ -180,7 +157,7 @@ function getButton(status: ServerStatus): ActionRowBuilder | undefined {
  * The interaction object.
  */
 function testConnection(
-  interaction: ChatInputCommandInteraction | ButtonInteraction,
+  interaction: InteractionType,
   onSuccess: string,
   onFail: string,
   status: ServerStatus
@@ -195,13 +172,11 @@ function testConnection(
       } else {
         interaction
           .followUp(
-            createMessage(
-              "Test connection:",
-              undefined,
-              res === status ? onSuccess : onFail,
-              undefined,
-              getButton(res)
-            )
+            createMessage({
+              title: "Test connection:",
+              description: res === status ? onSuccess : onFail,
+              actionRow: getButton(res),
+            })
           )
           .then((message) => (previousMsg = message));
         clearInterval(connectionTest);
@@ -210,9 +185,41 @@ function testConnection(
   }, parseInt(process.env.SERVER_TEST_INTERVAL!));
 }
 
-async function execute(
-  interaction: ChatInputCommandInteraction | ButtonInteraction
-) {
+const executor: {
+  [key in Subcommand]: (
+    interaction: InteractionType
+  ) => Promise<[ServerStatus, NgrokTunnel?]>;
+} = {
+  [Subcommand.Start]: async (interaction: InteractionType) => {
+    const status = await Promise.all([server.start(), ngrok.start()]);
+    if (status[0] == ServerStatus.Starting) {
+      testConnection(
+        interaction,
+        `Server starts successfully`,
+        `Server fails to start in the test`,
+        ServerStatus.Online
+      );
+    }
+    return status;
+  },
+  [Subcommand.Stop]: async (interaction) => {
+    const status = await Promise.all([server.stop(), ngrok.stop()]);
+    if (status[0] == ServerStatus.Starting) {
+      testConnection(
+        interaction,
+        `Server stops successfully`,
+        `Server fails to stop in the test`,
+        ServerStatus.Offline
+      );
+    }
+    return status;
+  },
+  [Subcommand.Status]: async (interaction) => {
+    return await Promise.all([server.status(), ngrok.status()]);
+  },
+};
+
+async function execute(interaction: InteractionType) {
   await previousMsg?.edit({
     components: [],
   });
@@ -220,23 +227,11 @@ async function execute(
   await interaction.deferReply();
 
   let subcommand = getSubcommand(interaction);
-  let { status, tunnel } = await executeSubcommand(subcommand);
+  let [status, tunnel] = await executor[subcommand](interaction);
 
   previousMsg = await interaction.editReply(
     getReply(subcommand, status, tunnel)
   );
-
-  if (
-    (subcommand == Subcommand.Start || subcommand == Subcommand.Stop) &&
-    status == ServerStatus.Starting
-  ) {
-    testConnection(
-      interaction,
-      `Server ${subcommand}s successfully`,
-      `Server fails to ${subcommand} in the test`,
-      subcommand == "start" ? ServerStatus.Online : ServerStatus.Offline
-    );
-  }
 }
 
 export { data, execute };

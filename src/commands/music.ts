@@ -13,7 +13,8 @@ import {
   VoiceConnection,
   VoiceConnectionStatus,
 } from "@discordjs/voice";
-import { Player, UpdateMessageSender } from "../utils/Player";
+import { Updater } from "../utils/Updater";
+import { Player } from "../utils/Player";
 import { createMessage } from "../utils/utils";
 
 enum Subcommand {
@@ -26,6 +27,8 @@ enum Subcommand {
   ClearQueue = "clearqueue",
   Pause = "pause",
   Unpause = "unpause",
+  Loop = "loop",
+  Unloop = "unloop",
 }
 
 const data = new SlashCommandBuilder()
@@ -81,20 +84,18 @@ const data = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) =>
     subcommand.setName(Subcommand.Unpause).setDescription("Unpause the player")
+  )
+  .addSubcommand((subcommand) =>
+    subcommand.setName(Subcommand.Loop).setDescription("Loop the playing song")
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName(Subcommand.Unloop)
+      .setDescription("Continue to play the next song in the queue")
   );
 
-let updateChannel: TextBasedChannel | undefined = undefined;
-
-const sendUpdateMessage: UpdateMessageSender = (
-  message: string,
-  url: string | undefined = undefined,
-  description: string | undefined = undefined,
-  field: Array<APIEmbedField> = []
-) => {
-  updateChannel?.send(createMessage(message, url, description, field));
-};
-
-const player = new Player(sendUpdateMessage);
+const updater = new Updater();
+const player = new Player(updater);
 let connection: VoiceConnection | undefined = undefined;
 let subscription: PlayerSubscription | undefined = undefined;
 
@@ -182,7 +183,7 @@ async function leave() {
  */
 async function execute(interaction: ChatInputCommandInteraction) {
   let subcommand = interaction.options.getSubcommand() as Subcommand;
-  updateChannel = interaction.channel as TextBasedChannel;
+  updater.channel = interaction.channel as TextBasedChannel;
 
   await interaction.deferReply();
   const status = await connect(interaction);

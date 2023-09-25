@@ -1,6 +1,5 @@
 import { Rcon } from "rcon-client";
 import { ChildProcess, spawn } from "child_process";
-import { APIEmbedField } from "discord.js";
 
 /**
  * Minecraft server object used to control the minecraft server throught rcon.
@@ -39,8 +38,7 @@ export class Server {
       });
       this.process.stderr?.on("data", (data: any) => {
         console.error(`${data}`);
-        this.process?.kill("SIGINT");
-        this.process = undefined;
+        this.killServer();
       });
     }
   }

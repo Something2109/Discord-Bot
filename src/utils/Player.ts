@@ -6,6 +6,7 @@ import {
 } from "@discordjs/voice";
 import { APIEmbedField } from "discord.js";
 import ytdl from "ytdl-core";
+import { Updater } from "./Updater";
 
 interface AudioInfo {
   url: string;
@@ -13,22 +14,13 @@ interface AudioInfo {
   title: string;
 }
 
-export interface UpdateMessageSender {
-  (
-    message: string,
-    url?: string | undefined,
-    description?: string | undefined,
-    field?: Array<APIEmbedField>
-  ): void;
-}
-
 export class Player {
   private _audioPlayer: AudioPlayer;
-  private loop: boolean;
+  private looping: boolean;
   private playing?: AudioInfo;
   private queue: Array<AudioInfo>;
 
-  constructor(sendUpdateMessage: UpdateMessageSender) {
+  constructor(updater: Updater) {
     this._audioPlayer = createAudioPlayer()
       .on("stateChange", (oldState, newState) => {
         console.log(
@@ -37,12 +29,12 @@ export class Player {
       })
       .on("error", (error) => {
         console.error(`Audio Player Error: ${error.message} with resources`);
-        sendUpdateMessage(
+        updater.send(
           `Error when playing ${this.playing?.title}: ${error.message}`
         );
       })
       .on(AudioPlayerStatus.Idle, () => {
-        if (this.loop) {
+        if (this.looping) {
           this.play();
         } else {
           this.playing = this.queue.shift();
@@ -50,14 +42,14 @@ export class Player {
         }
       })
       .on(AudioPlayerStatus.Playing, () => {
-        sendUpdateMessage(
+        updater.send(
           `Playing ${this.playing?.title}`,
           this.playing?.url,
           undefined,
           this.list()
         );
       });
-    this.loop = false;
+    this.looping = false;
     this.playing = undefined;
     this.queue = new Array<AudioInfo>();
   }
@@ -169,6 +161,7 @@ export class Player {
   public stop(): string {
     this.clearqueue();
     this._audioPlayer.stop(true);
+    this.playing = undefined;
     return "Music stopped";
   }
 
@@ -219,5 +212,23 @@ export class Player {
     return this._audioPlayer.unpause()
       ? "Unpaused the player"
       : "Failed to unpause the player";
+  }
+
+  /**
+   * Make the player starts playing loop.
+   * @returns The reply string.
+   */
+  loop() {
+    this.looping = true;
+    return "Start playing loop";
+  }
+
+  /**
+   * Make the player stops playing loop.
+   * @returns The reply string.
+   */
+  unloop() {
+    this.looping = false;
+    return "Stop playing loop";
   }
 }

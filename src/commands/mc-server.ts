@@ -188,7 +188,7 @@ function testConnection(
   let remainTestTime = parseInt(process.env.SERVER_TEST_TIME!);
   let connectionTest = setInterval(() => {
     server.status().then((res) => {
-      if (res == undefined) {
+      if (res == ServerStatus.Starting) {
         return;
       } else if (res !== status && remainTestTime > 0) {
         remainTestTime--;

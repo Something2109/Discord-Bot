@@ -1,3 +1,5 @@
 .env
+*.js
 *.map
 node_modules
+out

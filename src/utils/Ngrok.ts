@@ -11,6 +11,20 @@ export interface NgrokTunnel {
  * or undefined if these is none.
  */
 export class Ngrok {
+  private readonly controlUrl: string;
+  private readonly tunnel;
+
+  constructor() {
+    this.controlUrl = process.env.NGROK_CONTROL
+      ? `http://${process.env.NGROK_CONTROL}/api/tunnels`
+      : `http://localhost:4040/api/tunnels`;
+    this.tunnel = {
+      addr: process.env.MC_PORT ? process.env.MC_PORT : "25565",
+      proto: "tcp",
+      name: process.env.NGROK_NAME ? process.env.NGROK_NAME : "mc-server",
+    };
+  }
+
   /**
    * Check the running tunnel and create one if none running.
    * @returns the tunnel running or created.
@@ -29,12 +43,9 @@ export class Ngrok {
   async status(): Promise<NgrokTunnel | undefined> {
     let tunnel = undefined;
     try {
-      let response = await fetch(
-        `http://${process.env.NGROK_CONTROL}/api/tunnels`,
-        {
-          method: "GET",
-        }
-      );
+      let response = await fetch(this.controlUrl, {
+        method: "GET",
+      });
       if (response.ok) {
         let object = await response.json();
         let tunnel_arr = object.tunnels;
@@ -55,12 +66,9 @@ export class Ngrok {
     let tunnel: NgrokTunnel | undefined = await this.status();
     if (tunnel) {
       try {
-        let response = await fetch(
-          `http://${process.env.NGROK_CONTROL}/api/tunnels/${tunnel.name}`,
-          {
-            method: "DELETE",
-          }
-        );
+        let response = await fetch(`${this.controlUrl}/${tunnel.name}`, {
+          method: "DELETE",
+        });
         if (response.ok) {
           tunnel = undefined;
         }
@@ -76,21 +84,14 @@ export class Ngrok {
    */
   async create(): Promise<NgrokTunnel | undefined> {
     try {
-      let response = await fetch(
-        `http://${process.env.NGROK_CONTROL}/api/tunnels`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            addr: process.env.MC_PORT,
-            proto: "tcp",
-            name: process.env.NGROK_NAME,
-          }),
-        }
-      );
+      let response = await fetch(this.controlUrl, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(this.tunnel),
+      });
       if (response.ok) {
         let tunnel = await response.json();
         return tunnel;

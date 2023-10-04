@@ -9,10 +9,12 @@ import {
   BaseMessageOptions,
   APIEmbedField,
   ActionRowBuilder,
+  TextBasedChannel,
 } from "discord.js";
 import { Server, ServerStatus } from "../utils/Server";
 import { Ngrok, NgrokTunnel } from "../utils/Ngrok";
-import { createMessage } from "../utils/utils";
+import { MessageAPI, createMessage } from "../utils/utils";
+import { ServerUpdater, Updater } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 
@@ -20,12 +22,14 @@ enum Subcommand {
   Start = "start",
   Stop = "stop",
   Status = "status",
+  List = "list",
 }
 
 const description: { [key in Subcommand]: string } = {
   [Subcommand.Start]: "Start the minecraft server",
   [Subcommand.Stop]: "Stop the minecraft server",
   [Subcommand.Status]: "Show the status of the minecraft server",
+  [Subcommand.List]: "List the players are playing in the server",
 };
 
 const reply: { [key in Subcommand]: { [key in ServerStatus]: string } } = {
@@ -41,6 +45,11 @@ const reply: { [key in Subcommand]: { [key in ServerStatus]: string } } = {
   },
   [Subcommand.Status]: {
     [ServerStatus.Online]: "Server is running",
+    [ServerStatus.Offline]: "Server is not running",
+    [ServerStatus.Starting]: "Server is starting or stopping",
+  },
+  [Subcommand.List]: {
+    [ServerStatus.Online]: "List of player",
     [ServerStatus.Offline]: "Server is not running",
     [ServerStatus.Starting]: "Server is starting or stopping",
   },
@@ -63,6 +72,11 @@ const data = new SlashCommandBuilder()
     subcommand
       .setName(Subcommand.Status)
       .setDescription(description[Subcommand.Status])
+  )
+  .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
+    subcommand
+      .setName(Subcommand.List)
+      .setDescription(description[Subcommand.List])
   );
 
 const buttons = {
@@ -78,9 +92,14 @@ const buttons = {
     .setCustomId(`${data.name} ${Subcommand.Status}`)
     .setLabel("Status")
     .setStyle(ButtonStyle.Secondary),
+  [Subcommand.List]: new ButtonBuilder()
+    .setCustomId(`${data.name} ${Subcommand.List}`)
+    .setLabel("List")
+    .setStyle(ButtonStyle.Secondary),
 };
 
 let previousMsg: Message | undefined = undefined;
+const updater: ServerUpdater = new ServerUpdater();
 const server = new Server();
 const ngrok = new Ngrok();
 
@@ -139,6 +158,7 @@ function getButton(status: ServerStatus): ActionRowBuilder | undefined {
   if (status == ServerStatus.Online) {
     return new ActionRowBuilder().addComponents(
       buttons[Subcommand.Status],
+      buttons[Subcommand.List],
       buttons[Subcommand.Stop]
     );
   } else if (status == ServerStatus.Offline) {
@@ -152,17 +172,21 @@ function getButton(status: ServerStatus): ActionRowBuilder | undefined {
 }
 
 /**
- * Test the connection after starting or stopping the server.
- * @param {} interaction
- * The interaction object.
+ * Used to test the connection of the server.
+ * @param onSuccess The message to send if success.
+ * @param onFail The message to send if fail.
+ * @param status The status to test.
  */
 function testConnection(
-  interaction: InteractionType,
   onSuccess: string,
   onFail: string,
   status: ServerStatus
 ) {
   let remainTestTime = parseInt(process.env.SERVER_TEST_TIME!);
+  remainTestTime ??= 10;
+  let testInterval = parseInt(process.env.SERVER_TEST_INTERVAL!);
+  testInterval ??= 2000;
+
   let connectionTest = setInterval(() => {
     server.status().then((res) => {
       if (res == ServerStatus.Starting) {
@@ -170,52 +194,64 @@ function testConnection(
       } else if (res !== status && remainTestTime > 0) {
         remainTestTime--;
       } else {
-        interaction
-          .followUp(
-            createMessage({
-              title: "Test connection:",
-              description: res === status ? onSuccess : onFail,
-              actionRow: getButton(res),
-            })
-          )
+        updater
+          .send({
+            title: "Test connection:",
+            description: res === status ? onSuccess : onFail,
+            actionRow: getButton(res),
+          })
           .then((message) => (previousMsg = message));
         clearInterval(connectionTest);
       }
     });
-  }, parseInt(process.env.SERVER_TEST_INTERVAL!));
+  }, testInterval);
 }
 
 const executor: {
-  [key in Subcommand]: (
-    interaction: InteractionType
-  ) => Promise<[ServerStatus, NgrokTunnel?]>;
+  [key in Subcommand]: (subcommand: Subcommand) => Promise<BaseMessageOptions>;
 } = {
-  [Subcommand.Start]: async (interaction: InteractionType) => {
-    const status = await Promise.all([server.start(), ngrok.start()]);
-    if (status[0] == ServerStatus.Starting) {
+  [Subcommand.Start]: async (subcommand) => {
+    const [status, tunnel] = await Promise.all([
+      server.start(updater),
+      ngrok.start(),
+    ]);
+    if (status == ServerStatus.Starting) {
       testConnection(
-        interaction,
         `Server starts successfully`,
         `Server fails to start in the test`,
         ServerStatus.Online
       );
     }
-    return status;
+    return getReply(subcommand, status, tunnel);
   },
-  [Subcommand.Stop]: async (interaction) => {
-    const status = await Promise.all([server.stop(), ngrok.stop()]);
-    if (status[0] == ServerStatus.Starting) {
+  [Subcommand.Stop]: async (subcommand) => {
+    const [status, tunnel] = await Promise.all([server.stop(), ngrok.stop()]);
+    if (status == ServerStatus.Starting) {
       testConnection(
-        interaction,
         `Server stops successfully`,
         `Server fails to stop in the test`,
         ServerStatus.Offline
       );
     }
-    return status;
+    return getReply(subcommand, status, tunnel);
   },
-  [Subcommand.Status]: async (interaction) => {
-    return await Promise.all([server.status(), ngrok.status()]);
+  [Subcommand.Status]: async (subcommand) => {
+    const [status, tunnel] = await Promise.all([
+      server.status(),
+      ngrok.status(),
+    ]);
+    return getReply(subcommand, status, tunnel);
+  },
+  [Subcommand.List]: async (subcommand): Promise<BaseMessageOptions> => {
+    const status = await server.status();
+    let message: MessageAPI = {
+      title: reply[subcommand][status],
+      actionRow: getButton(status),
+    };
+    if (status == ServerStatus.Online && server.list.length > 0) {
+      message.field = server.list;
+    }
+    return createMessage(message);
   },
 };
 
@@ -226,12 +262,12 @@ async function execute(interaction: InteractionType) {
 
   await interaction.deferReply();
 
-  let subcommand = getSubcommand(interaction);
-  let [status, tunnel] = await executor[subcommand](interaction);
+  updater.channel = interaction.channel as TextBasedChannel;
 
-  previousMsg = await interaction.editReply(
-    getReply(subcommand, status, tunnel)
-  );
+  const subcommand = getSubcommand(interaction);
+  const message = await executor[subcommand](subcommand);
+
+  previousMsg = await interaction.editReply(message);
 }
 
 export { data, execute };

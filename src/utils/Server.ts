@@ -1,5 +1,7 @@
-import { Rcon } from "rcon-client";
+import { Rcon, RconOptions } from "rcon-client";
 import { ChildProcess, spawn } from "child_process";
+import { ServerUpdater } from "./Updater";
+import { APIEmbedField } from "discord.js";
 
 /**
  * Minecraft server object used to control the minecraft server throught rcon.
@@ -9,35 +11,57 @@ import { ChildProcess, spawn } from "child_process";
  * Undefined: the server is starting.
  */
 export class Server {
-  private process: ChildProcess | undefined;
+  private readonly mcDirectory: string | undefined;
+  private readonly rconOption: RconOptions;
+  private readonly startInterval: number;
+  private readonly stopInterval: number;
+
+  private serverProcess: ChildProcess | undefined;
   private rcon: Rcon | undefined;
   private starting: boolean;
-  private players: Array<string> | undefined;
+  private players: Array<APIEmbedField>;
 
   constructor() {
-    this.process = undefined;
+    this.mcDirectory = process.env.MC_DIR;
+    this.rconOption = {
+      host: process.env.MC_HOST ? process.env.MC_HOST : "localhost",
+      port: parseInt(process.env.MC_RCON_PORT!),
+      password: process.env.MC_RCON_PASSWORD!,
+    };
+    this.startInterval = process.env.SERVER_START_INTERVAL
+      ? parseInt(process.env.SERVER_START_INTERVAL)
+      : 30000;
+    this.stopInterval = process.env.SERVER_STOP_INTERVAL
+      ? parseInt(process.env.SERVER_STOP_INTERVAL)
+      : 5000;
+
+    this.serverProcess = undefined;
     this.rcon = undefined;
     this.starting = false;
-    this.players = undefined;
+    this.players = [];
   }
 
   /**
    * Run the server in the server directory given in the .env file.
    */
-  spawnServer() {
-    this.process = spawn(
+  spawnServer(updater: ServerUpdater) {
+    this.serverProcess = spawn(
       "java",
       ["-Xmx7168M", "-Xms7168M", "-jar", "server.jar", "-nogui"],
       {
-        cwd: process.env.MC_DIR,
+        cwd: this.mcDirectory,
       }
     );
-    if (this.process) {
-      this.process.stdout?.on("data", (data: any) => {
+    if (this.serverProcess) {
+      this.serverProcess.stdout?.on("data", (data: any) => {
         console.log(`[MCS]: ${data}`);
+        let message = data.toString();
+        message = message.substring(message.lastIndexOf(":") + 1).trim();
+        updater.update(message);
       });
-      this.process.stderr?.on("data", (data: any) => {
-        console.error(`${data}`);
+      this.serverProcess.stderr?.on("data", (data: any) => {
+        console.error(`[MCS]: Error: ${data}`);
+        updater.send({ title: "Server encounters error" });
         this.killServer();
       });
     }
@@ -46,25 +70,22 @@ export class Server {
    * Kill the current running server.
    */
   killServer() {
-    this.process?.kill("SIGINT");
-    this.process = undefined;
+    this.serverProcess?.kill("SIGINT");
+    this.serverProcess = undefined;
   }
 
   /**
    * Start the Minecraft server.
    * @returns a boolean showing the state of the server.
    */
-  async start(): Promise<ServerStatus> {
+  async start(updater: ServerUpdater): Promise<ServerStatus> {
     let connection = await this.status();
     try {
       if (connection == ServerStatus.Offline) {
         this.starting = true;
-        setTimeout(
-          () => (this.starting = false),
-          parseInt(process.env.SERVER_START_INTERVAL!)
-        );
+        setTimeout(() => (this.starting = false), this.startInterval);
 
-        this.spawnServer();
+        this.spawnServer(updater);
 
         connection = ServerStatus.Starting;
       }
@@ -89,6 +110,10 @@ export class Server {
     }
     return status;
   }
+
+  public get list() {
+    return this.players;
+  }
   /**
    * Stop the minecraft through rcon.
    * @returns a boolean showing the state of the server.
@@ -98,10 +123,7 @@ export class Server {
     try {
       if (connection == ServerStatus.Online) {
         this.starting = true;
-        setTimeout(
-          () => (this.starting = false),
-          parseInt(process.env.SERVER_STOP_INTERVAL!)
-        );
+        setTimeout(() => (this.starting = false), this.stopInterval);
 
         let response = await this.rcon!.send("stop");
         if (response) {
@@ -124,23 +146,31 @@ export class Server {
   async connect(): Promise<Rcon | undefined> {
     try {
       if (!this.rcon) {
-        this.rcon = await Rcon.connect({
-          host: process.env.MC_HOST!,
-          port: parseInt(process.env.MC_RCON_PORT!),
-          password: process.env.MC_RCON_PASSWORD!,
-        });
+        this.rcon = await Rcon.connect(this.rconOption);
       }
-      let response = await this.rcon.send("list");
+      let response = await this.rcon.send("list uuids");
       if (response) {
-        this.players = response
-          .substring(response.indexOf(":") + 1)
-          .split(" ")
-          .filter((value) => value.length);
+        console.log(response);
+        response = response.substring(response.indexOf(":") + 1).trim();
+        if (response.length) {
+          this.players = response
+            .split(")")
+            .filter((value) => value.length)
+            .map((value) => {
+              let player = value.trim().split(" (");
+              return {
+                name: player[0],
+                value: player[1],
+              };
+            });
+        } else {
+          this.players.length = 0;
+        }
       }
     } catch (error) {
       console.log(error);
       this.rcon = undefined;
-      this.players = undefined;
+      this.players.length = 0;
     }
     return this.rcon;
   }
@@ -154,7 +184,7 @@ export class Server {
       console.log(error);
     }
     this.rcon = undefined;
-    this.players = undefined;
+    this.players.length = 0;
     this.killServer();
   }
 }

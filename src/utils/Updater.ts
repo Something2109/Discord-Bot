@@ -1,4 +1,4 @@
-import { APIEmbedField, TextBasedChannel } from "discord.js";
+import { APIEmbedField, Message, TextBasedChannel } from "discord.js";
 import { MessageAPI, createMessage } from "./utils";
 
 export class Updater {
@@ -8,12 +8,12 @@ export class Updater {
     this.textChannel = channel;
   }
 
-  send(message: MessageAPI) {
-    this.textChannel?.send(createMessage(message));
+  async send(message: MessageAPI): Promise<Message | undefined> {
+    return this.textChannel?.send(createMessage(message));
   }
 }
 
-class ServerUpdater extends Updater {
+export class ServerUpdater extends Updater {
   update(message: string, list?: Array<APIEmbedField>) {
     if (message.includes("joined") || message.includes("left")) {
       this.send({ title: message, field: list });

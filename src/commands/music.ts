@@ -166,13 +166,7 @@ function joinVoice(channel: VoiceBasedChannel) {
 async function connect(interaction: InteractionType): Promise<boolean> {
   const member = interaction.member as GuildMember;
   const userVoiceChannel = member.voice.channel;
-  if (!userVoiceChannel) {
-    await interaction.editReply(
-      createMessage({
-        title: "You need to join a voice channel to play the music",
-      })
-    );
-  } else {
+  if (userVoiceChannel) {
     if (!connection) {
       joinVoice(userVoiceChannel);
     } else if (userVoiceChannel.id !== connection.joinConfig.channelId) {
@@ -253,15 +247,18 @@ const executor: {
  * @param interaction The interaction object.
  */
 async function execute(interaction: InteractionType) {
-  let subcommand = interaction.options.getSubcommand() as Subcommand;
-  updater.channel = interaction.channel as TextBasedChannel;
-
   await interaction.deferReply();
+
+  updater.channel = interaction.channel as TextBasedChannel;
   const status = await connect(interaction);
-  if (status) {
-    const message = await executor[subcommand](interaction);
-    await interaction.editReply(message);
-  }
+
+  const subcommand = interaction.options.getSubcommand() as Subcommand;
+  const message: BaseMessageOptions = status
+    ? await executor[subcommand](interaction)
+    : createMessage({
+        title: "You need to join a voice channel to play the music",
+      });
+  await interaction.editReply(message);
 }
 
 export { data, execute };

@@ -25,7 +25,9 @@ class Server {
     this.mcDirectory = process.env.MC_DIR;
     this.rconOption = {
       host: process.env.MC_HOST ? process.env.MC_HOST : "localhost",
-      port: parseInt(process.env.MC_RCON_PORT!),
+      port: process.env.MC_RCON_PORT
+        ? parseInt(process.env.MC_RCON_PORT)
+        : 25575,
       password: process.env.MC_RCON_PASSWORD!,
     };
     this.startInterval = process.env.SERVER_START_INTERVAL

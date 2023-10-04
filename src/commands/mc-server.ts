@@ -18,6 +18,11 @@ import { ServerUpdater } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 
+let previousMsg: Message | undefined = undefined;
+const updater: ServerUpdater = new ServerUpdater();
+const server = new Server();
+const ngrok = new Ngrok();
+
 enum Subcommand {
   Start = "start",
   Stop = "stop",
@@ -97,11 +102,6 @@ const buttons = {
     .setLabel("List")
     .setStyle(ButtonStyle.Secondary),
 };
-
-let previousMsg: Message | undefined = undefined;
-const updater: ServerUpdater = new ServerUpdater();
-const server = new Server();
-const ngrok = new Ngrok();
 
 /**
  * Get the subcommand to progress to the server.

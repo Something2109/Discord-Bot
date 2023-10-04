@@ -15,13 +15,15 @@ class Ngrok {
   private readonly tunnel;
 
   constructor() {
-    this.controlUrl = process.env.NGROK_CONTROL
-      ? `http://${process.env.NGROK_CONTROL}/api/tunnels`
+    this.controlUrl = process.env.NGROK_CONTROL_URL
+      ? `http://${process.env.NGROK_CONTROL_URL}/api/tunnels`
       : `http://localhost:4040/api/tunnels`;
     this.tunnel = {
       addr: process.env.MC_PORT ? process.env.MC_PORT : "25565",
       proto: "tcp",
-      name: process.env.NGROK_NAME ? process.env.NGROK_NAME : "mc-server",
+      name: process.env.NGROK_TUNNEL_NAME
+        ? process.env.NGROK_TUNNEL_NAME
+        : "mc-server",
     };
   }
 

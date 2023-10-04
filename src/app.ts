@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { CustomClient } from "./utils/utils";
+import { CustomClient } from "./utils/Client";
 import { GatewayIntentBits } from "discord.js";
 
 // Create a new client instance

@@ -1,6 +1,6 @@
 import { Rcon, RconOptions } from "rcon-client";
 import { ChildProcess, spawn } from "child_process";
-import { ServerUpdater } from "./Updater";
+import { ServerUpdater } from "utils/Updater";
 import { APIEmbedField } from "discord.js";
 
 /**
@@ -10,7 +10,7 @@ import { APIEmbedField } from "discord.js";
  * False: the server is not running.
  * Undefined: the server is starting.
  */
-export class Server {
+class Server {
   private readonly mcDirectory: string | undefined;
   private readonly rconOption: RconOptions;
   private readonly startInterval: number;
@@ -189,8 +189,10 @@ export class Server {
   }
 }
 
-export enum ServerStatus {
+enum ServerStatus {
   Online,
   Offline,
   Starting,
 }
+
+export { Server, ServerStatus };

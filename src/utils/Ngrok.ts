@@ -1,4 +1,4 @@
-export interface NgrokTunnel {
+interface NgrokTunnel {
   name: string;
   ID: string;
   public_url: string;
@@ -10,7 +10,7 @@ export interface NgrokTunnel {
  * All the functions return the tunnel object if these is a tunnel running
  * or undefined if these is none.
  */
-export class Ngrok {
+class Ngrok {
   private readonly controlUrl: string;
   private readonly tunnel;
 
@@ -102,3 +102,5 @@ export class Ngrok {
     return undefined;
   }
 }
+
+export { Ngrok, NgrokTunnel };

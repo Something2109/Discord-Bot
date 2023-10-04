@@ -6,18 +6,16 @@ import {
   TextBasedChannel,
   VoiceBasedChannel,
 } from "discord.js";
-import {
-  entersState,
-  joinVoiceChannel,
-  PlayerSubscription,
-  VoiceConnection,
-  VoiceConnectionStatus,
-} from "@discordjs/voice";
-import { Updater } from "../utils/Updater";
-import { Player } from "../utils/Player";
-import { createMessage } from "../utils/utils";
+import { Updater } from "utils/Updater";
+import { Player } from "utils/Player";
+import { createMessage } from "utils/utils";
+import { Connection } from "utils/Connection";
 
 type InteractionType = ChatInputCommandInteraction;
+
+const updater = new Updater();
+const player = new Player(updater);
+const connection = new Connection();
 
 enum Subcommand {
   Add = "add",
@@ -118,83 +116,6 @@ const data = new SlashCommandBuilder()
       .setDescription(description[Subcommand.Unloop])
   );
 
-const updater = new Updater();
-const player = new Player(updater);
-let connection: VoiceConnection | undefined = undefined;
-let subscription: PlayerSubscription | undefined = undefined;
-
-/**
- * Create a connection to the voice channer the user is in.
- * @param channel The channel the user is in.
- */
-function joinVoice(channel: VoiceBasedChannel) {
-  connection = joinVoiceChannel({
-    channelId: channel.id,
-    guildId: channel.guildId,
-    adapterCreator: channel.guild.voiceAdapterCreator,
-  });
-  connection.on("stateChange", (oldState, newState) => {
-    console.log(
-      `Connection transitioned from ${oldState.status} to ${newState.status}`
-    );
-  });
-  connection.on(
-    VoiceConnectionStatus.Disconnected,
-    async (oldState, newState) => {
-      try {
-        await Promise.race([
-          entersState(connection!, VoiceConnectionStatus.Signalling, 5_000),
-          entersState(connection!, VoiceConnectionStatus.Connecting, 5_000),
-        ]);
-      } catch (error) {
-        console.log(error);
-        await leave();
-      }
-    }
-  );
-
-  subscription = connection.subscribe(player.audioPlayer);
-}
-
-/**
- * Check the voice connection of the user create the command.
- * If there is no voice connection then notify user to join one.
- * If in the different channel then leave the old connection and join the new one.
- * @param interaction The interaction command.
- * @returns True if the user has voice connection else false.
- */
-async function connect(interaction: InteractionType): Promise<boolean> {
-  const member = interaction.member as GuildMember;
-  const userVoiceChannel = member.voice.channel;
-  if (userVoiceChannel) {
-    if (!connection) {
-      joinVoice(userVoiceChannel);
-    } else if (userVoiceChannel.id !== connection.joinConfig.channelId) {
-      subscription?.unsubscribe();
-      connection.destroy();
-      joinVoice(userVoiceChannel);
-    }
-    return true;
-  }
-  return false;
-}
-
-/**
- * Disconnect the connection to the current voice channel.
- * Clear the player queue.
- * @returns The reply string.
- */
-async function leave() {
-  player.stop();
-  subscription?.unsubscribe();
-  subscription = undefined;
-
-  connection?.destroy();
-  connection = undefined;
-
-  return "Left the voice channel";
-}
-
 const executor: {
   [key in Subcommand]: (
     interaction: InteractionType
@@ -211,7 +132,9 @@ const executor: {
     return createMessage({ title: reply });
   },
   [Subcommand.Leave]: async (interaction) => {
-    let reply = await leave();
+    player.stop();
+    await connection.leave();
+    const reply = "Left the voice channel";
     return createMessage({ title: reply });
   },
   [Subcommand.Skip]: async (interaction) => {
@@ -250,7 +173,13 @@ async function execute(interaction: InteractionType) {
   await interaction.deferReply();
 
   updater.channel = interaction.channel as TextBasedChannel;
-  const status = await connect(interaction);
+
+  const member = interaction.member as GuildMember;
+  const userVoiceChannel = member.voice.channel as VoiceBasedChannel;
+  const status = connection.connect(userVoiceChannel);
+  if (status) {
+    connection.subcribe = player;
+  }
 
   const subcommand = interaction.options.getSubcommand() as Subcommand;
   const message: BaseMessageOptions = status

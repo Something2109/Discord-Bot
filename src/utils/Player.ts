@@ -6,7 +6,7 @@ import {
 } from "@discordjs/voice";
 import { APIEmbedField } from "discord.js";
 import ytdl from "ytdl-core";
-import { Updater } from "./Updater";
+import { Updater } from "utils/Updater";
 
 interface AudioInfo {
   url: string;
@@ -14,7 +14,7 @@ interface AudioInfo {
   title: string;
 }
 
-export class Player {
+class Player {
   private _audioPlayer: AudioPlayer;
   private looping: boolean;
   private playing?: AudioInfo;
@@ -231,3 +231,5 @@ export class Player {
     return "Stop playing loop";
   }
 }
+
+export { Player };

@@ -11,10 +11,10 @@ import {
   ActionRowBuilder,
   TextBasedChannel,
 } from "discord.js";
-import { Server, ServerStatus } from "../utils/Server";
-import { Ngrok, NgrokTunnel } from "../utils/Ngrok";
-import { MessageAPI, createMessage } from "../utils/utils";
-import { ServerUpdater, Updater } from "../utils/Updater";
+import { Server, ServerStatus } from "utils/Server";
+import { Ngrok, NgrokTunnel } from "utils/Ngrok";
+import { MessageAPI, createMessage } from "utils/utils";
+import { ServerUpdater } from "utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 

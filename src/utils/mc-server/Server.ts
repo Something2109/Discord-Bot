@@ -1,6 +1,6 @@
 import { Rcon, RconOptions } from "rcon-client";
 import { ChildProcess, spawn } from "child_process";
-import { ServerUpdater } from "utils/Updater";
+import { ServerUpdater } from "../Updater";
 import { APIEmbedField } from "discord.js";
 
 /**

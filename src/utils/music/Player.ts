@@ -6,7 +6,7 @@ import {
 } from "@discordjs/voice";
 import { APIEmbedField } from "discord.js";
 import ytdl from "ytdl-core";
-import { Updater } from "utils/Updater";
+import { Updater } from "../Updater";
 
 interface AudioInfo {
   url: string;

@@ -6,10 +6,10 @@ import {
   TextBasedChannel,
   VoiceBasedChannel,
 } from "discord.js";
-import { Updater } from "utils/Updater";
-import { Player } from "utils/Player";
-import { createMessage } from "utils/utils";
-import { Connection } from "utils/Connection";
+import { Updater } from "../utils/Updater";
+import { Player } from "../utils/music/Player";
+import { createMessage } from "../utils/utils";
+import { Connection } from "../utils/music/Connection";
 
 type InteractionType = ChatInputCommandInteraction;
 

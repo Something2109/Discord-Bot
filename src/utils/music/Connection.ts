@@ -6,7 +6,7 @@ import {
   joinVoiceChannel,
 } from "@discordjs/voice";
 import { VoiceBasedChannel } from "discord.js";
-import { Player } from "utils/Player";
+import { Player } from "./Player";
 
 class Connection {
   private connection: VoiceConnection | undefined;

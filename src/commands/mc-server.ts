@@ -137,10 +137,16 @@ function getReply(
   };
   let ngrokReply: APIEmbedField = {
     name: "Ngrok",
-    value: tunnel
-      ? `Ngrok running at ${tunnel.public_url}`
-      : `Ngrok is not running`,
+    value: `Ngrok is not running`,
   };
+
+  if (tunnel) {
+    if (Ngrok.isMcTunnel(tunnel)) {
+      ngrokReply.value = `Ngrok running at ${tunnel.public_url}`;
+    } else {
+      ngrokReply.value = "Another application is using Ngrok now";
+    }
+  }
 
   return createMessage({
     title: `Command ${subcommand}:`,
@@ -225,7 +231,10 @@ const executor: {
     return getReply(subcommand, status, tunnel);
   },
   [Subcommand.Stop]: async (subcommand) => {
-    const [status, tunnel] = await Promise.all([server.stop(), ngrok.stop()]);
+    let [status, tunnel] = await Promise.all([server.stop(), ngrok.status()]);
+    if (tunnel && Ngrok.isMcTunnel(tunnel)) {
+      tunnel = await ngrok.stop();
+    }
     if (status == ServerStatus.Starting) {
       testConnection(
         `Server stops successfully`,

@@ -7,13 +7,12 @@ import {
   VoiceBasedChannel,
 } from "discord.js";
 import { Updater } from "../utils/Updater";
-import { Player } from "../utils/music/Player";
-import { createMessage } from "../utils/utils";
+import { AudioInfo, Player } from "../utils/music/Player";
 import { Connection } from "../utils/music/Connection";
 
 type InteractionType = ChatInputCommandInteraction;
 
-const updater = new Updater();
+const updater = new Updater("Music Player");
 const player = new Player(updater);
 const connection = new Connection();
 
@@ -116,6 +115,42 @@ const data = new SlashCommandBuilder()
       .setDescription(description[Subcommand.Unloop])
   );
 
+function getReplyFromInfo(
+  audio: AudioInfo | undefined,
+  onExist: string,
+  onEmpty: string
+) {
+  if (audio) {
+    return updater.message({
+      description: onExist,
+      field: [
+        {
+          name: audio.title,
+          value: audio.url,
+        },
+      ],
+    });
+  }
+  return updater.message({ description: onEmpty });
+}
+
+function getReplyFromList(
+  audio: AudioInfo[],
+  onExist: string,
+  onEmpty: string
+) {
+  if (audio instanceof Array && audio.length > 0) {
+    return updater.message({
+      description: onExist,
+      field: player.list.map((info, index) => ({
+        name: `${index + 1}. ${info.title}`,
+        value: info.url,
+      })),
+    });
+  }
+  return updater.message({ description: onEmpty });
+}
+
 const executor: {
   [key in Subcommand]: (
     interaction: InteractionType
@@ -123,45 +158,75 @@ const executor: {
 } = {
   [Subcommand.Add]: async (interaction) => {
     const url = interaction.options.getString("url");
-    const reply = await player.add(url);
-    return createMessage({ title: reply, url: url ? url : undefined });
+    const newAudio = await player.add(url);
+    return getReplyFromInfo(newAudio, "Add a song:", "Invalid song");
   },
   [Subcommand.Remove]: async (interaction) => {
     const number = interaction.options.getNumber("number");
-    const reply = player.remove(number!);
-    return createMessage({ title: reply });
+    const removed = player.remove(number!);
+    return getReplyFromInfo(
+      removed,
+      "Remove the song:",
+      "Failed to remove song from the queue"
+    );
   },
   [Subcommand.Leave]: async (interaction) => {
     player.stop();
     await connection.leave();
-    const reply = "Left the voice channel";
-    return createMessage({ title: reply });
+    return updater.message({ description: "Left the voice channel" });
   },
   [Subcommand.Skip]: async (interaction) => {
-    return createMessage({ title: player[Subcommand.Skip]() });
+    const skipped = player[Subcommand.Skip]();
+    return getReplyFromInfo(
+      skipped,
+      "Skip the song",
+      "There's no song playing"
+    );
   },
   [Subcommand.Stop]: async (interaction) => {
-    return createMessage({ title: player[Subcommand.Stop]() });
+    player[Subcommand.Stop]();
+    return updater.message({ description: "Music stopped" });
   },
   [Subcommand.List]: async (interaction) => {
-    const reply = "List of songs in the queue";
-    const queue = player.list();
-    return createMessage({ title: reply, field: queue });
+    return getReplyFromList(
+      player.list,
+      "List of songs in the queue:",
+      "Empty queue"
+    );
   },
   [Subcommand.ClearQueue]: async (interaction) => {
-    return createMessage({ title: player[Subcommand.ClearQueue]() });
+    const oldQueue = player[Subcommand.ClearQueue]();
+    return getReplyFromList(
+      oldQueue,
+      "Clear the queue",
+      "Queue is already empty"
+    );
   },
   [Subcommand.Pause]: async (interaction) => {
-    return createMessage({ title: player[Subcommand.Pause]() });
+    return updater.message({
+      description: player[Subcommand.Pause]()
+        ? "Paused the player"
+        : "Failed to pause the player",
+    });
   },
   [Subcommand.Unpause]: async (interaction) => {
-    return createMessage({ title: player[Subcommand.Unpause]() });
+    return updater.message({
+      description: player[Subcommand.Unpause]()
+        ? "Unpaused the player"
+        : "Failed to unpause the player",
+    });
   },
   [Subcommand.Loop]: async (interaction) => {
-    return createMessage({ title: player[Subcommand.Loop]() });
+    const loop = player[Subcommand.Loop]();
+    return getReplyFromInfo(loop, "Loop the song:", "Starts looping.");
   },
   [Subcommand.Unloop]: async (interaction) => {
-    return createMessage({ title: player[Subcommand.Unloop]() });
+    const unloop = player[Subcommand.Unloop]();
+    return getReplyFromInfo(
+      unloop,
+      "Stops looping the song:",
+      "Stops looping."
+    );
   },
 };
 
@@ -184,8 +249,8 @@ async function execute(interaction: InteractionType) {
   const subcommand = interaction.options.getSubcommand() as Subcommand;
   const message: BaseMessageOptions = status
     ? await executor[subcommand](interaction)
-    : createMessage({
-        title: "You need to join a voice channel to play the music",
+    : updater.message({
+        description: "You need to join a voice channel to play the music",
       });
   await interaction.editReply(message);
 }

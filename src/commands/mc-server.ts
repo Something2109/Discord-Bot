@@ -13,13 +13,12 @@ import {
 } from "discord.js";
 import { Server, ServerStatus } from "../utils/mc-server/Server";
 import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
-import { MessageAPI, createMessage } from "../utils/utils";
-import { ServerUpdater } from "../utils/Updater";
+import { Updater, MessageAPI } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 
 let previousMsg: Message | undefined = undefined;
-const updater: ServerUpdater = new ServerUpdater();
+const updater: Updater = new Updater("Minecraft Server");
 const server = new Server();
 const ngrok = new Ngrok();
 
@@ -148,8 +147,8 @@ function getReply(
     }
   }
 
-  return createMessage({
-    title: `Command ${subcommand}:`,
+  return updater.message({
+    description: `Command ${subcommand}:`,
     field: [serverReply, ngrokReply],
     actionRow: getButton(status),
   });
@@ -177,42 +176,6 @@ function getButton(status: ServerStatus): ActionRowBuilder | undefined {
   }
 }
 
-/**
- * Used to test the connection of the server.
- * @param onSuccess The message to send if success.
- * @param onFail The message to send if fail.
- * @param status The status to test.
- */
-function testConnection(
-  onSuccess: string,
-  onFail: string,
-  status: ServerStatus
-) {
-  let remainTestTime = parseInt(process.env.SERVER_TEST_TIME!);
-  remainTestTime ??= 10;
-  let testInterval = parseInt(process.env.SERVER_TEST_INTERVAL!);
-  testInterval ??= 2000;
-
-  let connectionTest = setInterval(() => {
-    server.status().then((res) => {
-      if (res == ServerStatus.Starting) {
-        return;
-      } else if (res !== status && remainTestTime > 0) {
-        remainTestTime--;
-      } else {
-        updater
-          .send({
-            title: "Test connection:",
-            description: res === status ? onSuccess : onFail,
-            actionRow: getButton(res),
-          })
-          .then((message) => (previousMsg = message));
-        clearInterval(connectionTest);
-      }
-    });
-  }, testInterval);
-}
-
 const executor: {
   [key in Subcommand]: (subcommand: Subcommand) => Promise<BaseMessageOptions>;
 } = {
@@ -221,26 +184,12 @@ const executor: {
       server.start(updater),
       ngrok.start(),
     ]);
-    if (status == ServerStatus.Starting) {
-      testConnection(
-        `Server starts successfully`,
-        `Server fails to start in the test`,
-        ServerStatus.Online
-      );
-    }
     return getReply(subcommand, status, tunnel);
   },
   [Subcommand.Stop]: async (subcommand) => {
     let [status, tunnel] = await Promise.all([server.stop(), ngrok.status()]);
     if (tunnel && Ngrok.isMcTunnel(tunnel)) {
       tunnel = await ngrok.stop();
-    }
-    if (status == ServerStatus.Starting) {
-      testConnection(
-        `Server stops successfully`,
-        `Server fails to stop in the test`,
-        ServerStatus.Offline
-      );
     }
     return getReply(subcommand, status, tunnel);
   },
@@ -254,13 +203,18 @@ const executor: {
   [Subcommand.List]: async (subcommand): Promise<BaseMessageOptions> => {
     const status = await server.status();
     let message: MessageAPI = {
-      title: reply[subcommand][status],
+      description: reply[subcommand][status],
       actionRow: getButton(status),
     };
-    if (status == ServerStatus.Online && server.list.length > 0) {
-      message.field = server.list;
+    if (server.list.length > 0) {
+      message.field = server.list.map((player) => {
+        return {
+          name: player.name,
+          value: player.uuid,
+        };
+      });
     }
-    return createMessage(message);
+    return updater.message(message);
   },
 };
 

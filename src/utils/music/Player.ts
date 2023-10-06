@@ -4,7 +4,6 @@ import {
   createAudioResource,
   AudioPlayerStatus,
 } from "@discordjs/voice";
-import { APIEmbedField } from "discord.js";
 import ytdl from "ytdl-core";
 import { Updater } from "../Updater";
 
@@ -30,7 +29,7 @@ class Player {
       .on("error", (error) => {
         console.error(`Audio Player Error: ${error.message} with resources`);
         updater.send({
-          title: `Error when playing ${this.playing?.title}: ${error.message}`,
+          description: `Error when playing ${this.playing?.title}: ${error.message}`,
         });
       })
       .on(AudioPlayerStatus.Idle, () => {
@@ -43,9 +42,8 @@ class Player {
       })
       .on(AudioPlayerStatus.Playing, () => {
         updater.send({
-          title: `Playing ${this.playing?.title}`,
+          description: `Playing ${this.playing?.title}`,
           url: this.playing?.url,
-          field: this.list(),
         });
       });
     this.looping = false;
@@ -104,10 +102,9 @@ class Player {
    * @param title The title to represent in the list.
    * @param length The length of the song to allocate the buffer.
    * @param channel The channel of the sent request to send update.
-   * @returns The reply string indicate the song added to the queue.
+   * @returns The Audio info of the song added to the queue or undefined.
    */
-  public async add(url: string | null): Promise<string> {
-    let reply = "Invalid youtube url";
+  public async add(url: string | null): Promise<AudioInfo | undefined> {
     if (url && this.validateUrl(url)) {
       try {
         const NewAudio = await this.getVideoInfo(url);
@@ -117,119 +114,97 @@ class Player {
         } else {
           this.queue.push(NewAudio);
         }
-        reply = `Added the song ${NewAudio.title} to the queue`;
+        return NewAudio;
       } catch (error) {
         console.log(error);
-        reply = "Cannot add the song";
       }
     }
-    return reply;
+    return undefined;
   }
 
   /**
    * Remove a song from the queue.
    * @param {number} number The number of the song in the queue.
-   * @returns the reply string indicate the song removed from the queue.
+   * @returns the audio info of the song removed from the queue or undefined.
    */
-  public remove(number: number | null): string {
-    let reply = "Failed to remove song from the queue";
+  public remove(number: number | null): AudioInfo | undefined {
     if (number && number > 0 && number <= this.queue.length) {
       let removed = this.queue.splice(number - 1, 1);
-      reply = `Removed ${removed[0].title} from the queue.`;
+      return removed[0];
     }
-    return reply;
+    return undefined;
   }
 
   /**
    * Skip the playing song.
-   * @returns The reply string indicate the skipped song.
+   * @returns The audio info of the skipped song.
    */
-  public skip(): string {
-    let reply = "There's no song playing";
-    if (this.playing) {
-      reply = `Skip the song ${this.playing.title}`;
-      this._audioPlayer.stop(true);
-    }
-    return reply;
+  public skip(): AudioInfo | undefined {
+    const oldSong = this.playing;
+    this._audioPlayer.stop(true);
+    return oldSong;
   }
 
   /**
    * Stop the player from continue playing.
-   * @returns The reply string.
    */
-  public stop(): string {
+  public stop() {
     this.clearqueue();
     this.playing = undefined;
     this._audioPlayer.stop(true);
-    return "Music stopped";
   }
 
   /**
    * Get a list of the songs in the queue.
-   * @returns The embed field array of the songs in the queue.
+   * @returns The audio info array of the songs in the queue.
    */
-  public list(): Array<APIEmbedField> {
-    let field = [];
-    if (this.queue.length > 0) {
-      field = this.queue.map((info, index) => ({
-        name: `${index + 1}. ${info.title}`,
-        value: info.url,
-      }));
-    } else {
-      field.push({
-        name: "Empty queue",
-        value: "Use the /music add to add more songs to the queue",
-      });
-    }
-    return field;
+  public get list() {
+    return this.queue;
   }
 
   /**
    * Clear the player queue.
-   * @returns The reply string.
+   * @returns The old queue.
    */
-  public clearqueue(): string {
-    this.queue.length = 0;
-    return "Clear the queue";
+  public clearqueue() {
+    const oldQueue = this.queue;
+    this.queue = [];
+    return oldQueue;
   }
 
   /**
    * Pause the player.
    * @returns The reply string.
    */
-  public pause(): string {
-    return this._audioPlayer.pause()
-      ? "Paused the player"
-      : "Failed to pause the player";
+  public pause(): boolean {
+    return this._audioPlayer.pause();
   }
 
   /**
    * Make the player continue to play.
    * @returns The reply string.
    */
-  public unpause(): string {
-    return this._audioPlayer.unpause()
-      ? "Unpaused the player"
-      : "Failed to unpause the player";
+  public unpause(): boolean {
+    return this._audioPlayer.unpause();
   }
 
   /**
    * Make the player starts playing loop.
-   * @returns The reply string.
+   * @returns The audio info of the current (loop) song.
    */
-  loop() {
+  loop(): AudioInfo | undefined {
     this.looping = true;
-    return "Start playing loop";
+    return this.playing;
   }
 
   /**
    * Make the player stops playing loop.
-   * @returns The reply string.
+   * @returns The audio info of the current song.
    */
-  unloop() {
+  unloop(): AudioInfo | undefined {
     this.looping = false;
-    return "Stop playing loop";
+    return this.playing;
   }
 }
 
-export { Player };
+export { Player, AudioInfo };

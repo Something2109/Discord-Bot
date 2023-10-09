@@ -1,36 +1,22 @@
-import { Rcon, RconOptions } from "rcon-client";
 import { ChildProcess, spawn } from "child_process";
 import { Updater } from "../Updater";
 import path from "node:path";
+
 /**
- * Minecraft server object used to control the minecraft server throught rcon.
- * All the functions return a boolean with three states:
- * True: the server is running.
- * False: the server is not running.
- * Undefined: the server is starting.
+ * Minecraft server object used to control the minecraft server.
  */
 class Server {
-  private readonly mcDirectory: string | undefined;
-  private readonly serverArguments: Array<string>;
-  private readonly rconOption: RconOptions;
+  private readonly directory: string | undefined;
+  private readonly arguments: Array<string>;
 
-  private serverProcess: ChildProcess | undefined;
-  private rcon: Rcon | undefined;
+  private process: ChildProcess | undefined;
   private starting: boolean;
   private players: Array<PlayerInfo>;
 
   constructor() {
-    [this.mcDirectory, ...this.serverArguments] = this.pathResolver();
-    this.rconOption = {
-      host: process.env.MC_HOST ? process.env.MC_HOST : "localhost",
-      port: process.env.MC_RCON_PORT
-        ? parseInt(process.env.MC_RCON_PORT)
-        : 25575,
-      password: process.env.MC_RCON_PASSWORD!,
-    };
+    [this.directory, ...this.arguments] = this.pathResolver();
 
-    this.serverProcess = undefined;
-    this.rcon = undefined;
+    this.process = undefined;
     this.starting = false;
     this.players = new Array();
   }
@@ -51,7 +37,7 @@ class Server {
       }
     } catch (error) {
       console.log(error);
-      this.disconnect();
+      this.killServer();
     }
     return connection;
   }
@@ -59,14 +45,11 @@ class Server {
   /**
    * Check if these is a connection to server.
    * @returns The server status showing the state of connection
-   * or undefined if the server on starting state.
    */
   public async status(): Promise<ServerStatus> {
     let status = ServerStatus.Starting;
     if (!this.starting) {
-      let connection = await this.connect();
-      status =
-        connection instanceof Rcon ? ServerStatus.Online : ServerStatus.Offline;
+      status = this.process ? ServerStatus.Online : ServerStatus.Offline;
     }
     return status;
   }
@@ -79,7 +62,7 @@ class Server {
   }
 
   /**
-   * Stop the minecraft through rcon.
+   * Stop the minecraftv server.
    * @returns The server status showing the state of the server.
    */
   public async stop(): Promise<ServerStatus> {
@@ -88,20 +71,21 @@ class Server {
       if (connection == ServerStatus.Online) {
         this.starting = true;
 
-        let response = await this.rcon!.send("stop");
-        if (response) {
-          await this.disconnect();
-        }
+        this.sendCommand("stop");
 
         connection = ServerStatus.Starting;
       }
     } catch (error) {
       console.log(error);
-      await this.disconnect();
+      this.killServer();
     }
     return connection;
   }
 
+  /**
+   * Read the server directory and the start arguments from the specified env variables.
+   * @returns the array contains the directory string and the arguments to start the server.
+   */
   private pathResolver() {
     if (!process.env.MC_DIR) {
       throw new Error("You need to add the server directory to env file");
@@ -123,7 +107,7 @@ class Server {
       fileName
     );
     if (!(process.env.MC_GUI === "true")) {
-      this.serverArguments.push("-nogui");
+      this.arguments.push("-nogui");
     }
     return result;
   }
@@ -133,64 +117,45 @@ class Server {
    * @param updater The updater to update important info to the user.
    */
   private spawnServer(updater: Updater) {
-    this.serverProcess = spawn("java", this.serverArguments, {
-      cwd: this.mcDirectory,
+    this.process = spawn("java", this.arguments, {
+      cwd: this.directory,
     });
-    if (this.serverProcess) {
-      this.serverProcess.stdout?.on("data", (data: any) => {
+    if (this.process) {
+      this.process.stdout?.on("data", (data: any) => {
         let rawMessage = data.toString();
         this.update(updater, rawMessage);
       });
-      this.serverProcess.stderr?.on("data", (data: any) => {
+      this.process.stderr?.on("data", (data: any) => {
         console.error(`[MCS]: Error: ${data}`);
         updater.send({ description: "Server encounters error" });
+        this.killServer();
+      });
+      this.process.on("close", () => {
+        this.starting = false;
+        updater.send({
+          description: "Server stops successfully",
+        });
         this.killServer();
       });
     }
   }
 
   /**
-   * Connect the bot to the minecraft rcon and refresh the player number.
-   * Shouldn't be called outside of the object to prevent outside adjustment of the rcon.
-   * @returns The Rcon object if the connection established successfully else undefined.
+   * Send the command to the Minecraft server.
+   * @param command The command to execute in the Minecraft server.
+   * @returns The boolean showing the state of the sent command.
    */
-  private async connect(): Promise<Rcon | undefined> {
-    try {
-      if (!this.rcon) {
-        this.rcon = await Rcon.connect(this.rconOption);
-      }
-      let response = await this.rcon.send("list uuids");
-      if (response) {
-        this.readPlayerList(response);
-      }
-    } catch (error) {
-      console.log(error);
-      this.rcon = undefined;
-      this.players.length = 0;
-    }
-    return this.rcon;
-  }
-
-  /**
-   * Disconnect the controller from the server.
-   */
-  private async disconnect(): Promise<void> {
-    try {
-      await this.rcon?.end();
-    } catch (error) {
-      console.log(error);
-    }
-    this.rcon = undefined;
-    this.players.length = 0;
-    this.killServer();
+  private sendCommand(command: string) {
+    return this.process?.stdin?.write(`/${command}\n`);
   }
 
   /**
    * Kill the current running server.
    */
   private killServer() {
-    this.serverProcess?.kill("SIGINT");
-    this.serverProcess = undefined;
+    this.process?.kill("SIGINT");
+    this.process = undefined;
+    this.players.length = 0;
   }
 
   /**
@@ -212,26 +177,24 @@ class Server {
         updater.send({
           description: message.trim(),
         });
-      } else if (message.includes("started") && this.starting) {
+        this.sendCommand("list uuids");
+      } else if (message.includes("Done") && this.starting) {
         this.starting = false;
         updater.send({
           description: "Server starts successfully",
         });
-      } else if (message.includes("stopped") && this.starting) {
-        this.starting = false;
-        updater.send({
-          description: "Server stops successfully",
-        });
+      } else if (message.includes("players") && !this.starting) {
+        this.readPlayerList(message);
       }
     }
   }
 
   /**
    * Read raw player list to update to the controller.
-   * @param response The raw response to the server.
+   * @param message The raw response to the server.
    */
-  private readPlayerList(response: string) {
-    const rawPlayerList = response.substring(response.indexOf(":") + 1).trim();
+  private readPlayerList(message: string) {
+    const rawPlayerList = message.substring(message.indexOf(":") + 1).trim();
     if (rawPlayerList.length) {
       this.players = rawPlayerList
         .split(")")

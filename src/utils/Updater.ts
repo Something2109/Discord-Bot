@@ -46,7 +46,11 @@ class Updater {
   }
 
   async send(message: MessageAPI): Promise<Message | undefined> {
-    return this.textChannel?.send(this.message(message));
+    try {
+      return this.textChannel?.send(this.message(message));
+    } catch (error) {
+      console.log(error);
+    }
   }
 }
 

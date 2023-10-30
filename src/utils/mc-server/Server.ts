@@ -122,8 +122,12 @@ class Server {
     });
     if (this.process) {
       this.process.stdout?.on("data", (data: any) => {
-        let rawMessage = data.toString();
-        this.update(updater, rawMessage);
+        const dataStr: string = data.toString();
+        const rawMessages = dataStr.split("\n").filter((value) => value.length);
+        rawMessages.forEach((message) => {
+          console.log(`[MCS] ${message}`);
+          this.update(updater, message);
+        });
       });
       this.process.stderr?.on("data", (data: any) => {
         console.error(`[MCS]: Error: ${data}`);
@@ -131,12 +135,33 @@ class Server {
         this.killServer();
       });
       this.process.on("close", () => {
-        this.starting = false;
         updater.send({
           description: "Server stops successfully",
         });
         this.killServer();
       });
+    }
+  }
+
+  /**
+   * Add a player to the list of players.
+   * @param name Name of the player.
+   */
+  private addPlayerToList(name: string) {
+    this.players.push({
+      name: name,
+      time: new Date(),
+    });
+  }
+
+  /**
+   * Remove a player to the list of players.
+   * @param name Name of the player.
+   */
+  private removePlayerFromList(name: string) {
+    const info = this.players.find((info) => info.name === name);
+    if (info) {
+      this.players.splice(this.players.indexOf(info), 1);
     }
   }
 
@@ -155,6 +180,7 @@ class Server {
   private killServer() {
     this.process?.kill("SIGINT");
     this.process = undefined;
+    this.starting = false;
     this.players.length = 0;
   }
 
@@ -164,50 +190,28 @@ class Server {
    * @param rawMessage The raw message from the minecraft server.
    */
   private update(updater: Updater, rawMessage: string) {
-    const messages = rawMessage
-      .split("\n")
-      .filter((value) => value.length)
-      .map((message) =>
-        message.replace(/\[(\d|\:)*\] \[(\d|\w| |\/|\:|\#|\-)*\]\:/, "").trim()
-      );
-    for (const message of messages) {
-      console.log(`[MCS]: ${message}`);
+    const message = rawMessage
+      .replace(/\[(\d|\:)*\] \[(\d|\w| |\/|\:|\#|\-)*\]\:/, "")
+      .trim();
 
-      if (message.includes("joined") || message.includes("left")) {
-        updater.send({
-          description: message.trim(),
-        });
-        this.sendCommand("list uuids");
-      } else if (message.includes("Done") && this.starting) {
+    if (this.starting) {
+      if (message.includes("Done")) {
         this.starting = false;
         updater.send({
           description: "Server starts successfully",
         });
-      } else if (message.includes("players") && !this.starting) {
-        this.readPlayerList(message);
       }
-    }
-  }
-
-  /**
-   * Read raw player list to update to the controller.
-   * @param message The raw response to the server.
-   */
-  private readPlayerList(message: string) {
-    const rawPlayerList = message.substring(message.indexOf(":") + 1).trim();
-    if (rawPlayerList.length) {
-      this.players = rawPlayerList
-        .split(")")
-        .filter((value) => value.length)
-        .map((value) => {
-          let player = value.trim().split(" (");
-          return {
-            name: player[0],
-            uuid: player[1],
-          };
-        });
     } else {
-      this.players.length = 0;
+      if (message.includes("joined") || message.includes("left")) {
+        updater.send({
+          description: message,
+        });
+        const playerName = message.split(" ", 1)[0];
+
+        message.includes("joined")
+          ? this.addPlayerToList(playerName)
+          : this.removePlayerFromList(playerName);
+      }
     }
   }
 }
@@ -220,7 +224,7 @@ enum ServerStatus {
 
 interface PlayerInfo {
   name: string;
-  uuid: string;
+  time: Date;
 }
 
 export { Server, ServerStatus };

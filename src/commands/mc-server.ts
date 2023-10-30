@@ -210,7 +210,7 @@ const executor: {
       message.field = server.list.map((player) => {
         return {
           name: player.name,
-          value: player.uuid,
+          value: `Time joined: ${player.time.toLocaleString()}`,
         };
       });
     }

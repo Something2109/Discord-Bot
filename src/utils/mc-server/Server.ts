@@ -8,13 +8,18 @@ import path from "node:path";
 class Server {
   private readonly directory: string | undefined;
   private readonly arguments: Array<string>;
+  private readonly timeoutMin: number;
 
   private process: ChildProcess | undefined;
   private starting: boolean;
   private players: Array<PlayerInfo>;
+  private stopTimeout?: NodeJS.Timeout;
 
   constructor() {
     [this.directory, ...this.arguments] = this.pathResolver();
+    this.timeoutMin = process.env.MC_TIMEOUT
+      ? parseFloat(process.env.MC_TIMEOUT)
+      : 6;
 
     this.process = undefined;
     this.starting = false;
@@ -182,6 +187,8 @@ class Server {
     this.process = undefined;
     this.starting = false;
     this.players.length = 0;
+    clearTimeout(this.stopTimeout);
+    this.stopTimeout = undefined;
   }
 
   /**
@@ -200,8 +207,9 @@ class Server {
         updater.send({
           description: "Server starts successfully",
         });
+        this.stopTimeoutManager(updater);
       }
-    } else {
+    } else if (!message.match(/<[a-zA-Z0-9_]{2,16}>/)) {
       if (message.includes("joined") || message.includes("left")) {
         updater.send({
           description: message,
@@ -211,7 +219,28 @@ class Server {
         message.includes("joined")
           ? this.addPlayerToList(playerName)
           : this.removePlayerFromList(playerName);
+
+        this.stopTimeoutManager(updater);
       }
+    }
+  }
+
+  private stopTimeoutManager(updater: Updater) {
+    if (this.players.length == 0 && !this.stopTimeout) {
+      updater.send({
+        description: `Server has no player playing, close in ${this.timeoutMin} minutes`,
+      });
+
+      this.stopTimeout = setTimeout(() => {
+        updater.send({
+          description: "Server is stopping due to no player playing",
+        });
+        this.stop();
+      }, this.timeoutMin * 60000);
+    } else if (this.players.length > 0 && this.stopTimeout) {
+      clearTimeout(this.stopTimeout);
+
+      this.stopTimeout = undefined;
     }
   }
 }

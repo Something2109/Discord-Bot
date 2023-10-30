@@ -128,12 +128,12 @@ function getReply(
   status: ServerStatus
 ): BaseMessageOptions {
   let serverReply: APIEmbedField = {
-    name: "Minecraft server:",
+    name: `Command ${subcommand}:`,
     value: reply[subcommand][status],
   };
 
   return updater.message({
-    description: `Command ${subcommand}:`,
+    description: server.host,
     field: [serverReply],
     actionRow: getButton(status),
   });

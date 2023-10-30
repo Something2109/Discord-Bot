@@ -12,7 +12,6 @@ import {
   TextBasedChannel,
 } from "discord.js";
 import { Server, ServerStatus } from "../utils/mc-server/Server";
-import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
 import { Updater, MessageAPI } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
@@ -20,7 +19,6 @@ type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 let previousMsg: Message | undefined = undefined;
 const updater: Updater = new Updater("Minecraft Server");
 const server = new Server();
-const ngrok = new Ngrok();
 
 enum Subcommand {
   Start = "start",
@@ -127,29 +125,16 @@ function getSubcommand(interaction: InteractionType): Subcommand {
  */
 function getReply(
   subcommand: Subcommand,
-  status: ServerStatus,
-  tunnel?: NgrokTunnel
+  status: ServerStatus
 ): BaseMessageOptions {
   let serverReply: APIEmbedField = {
     name: "Minecraft server:",
     value: reply[subcommand][status],
   };
-  let ngrokReply: APIEmbedField = {
-    name: "Ngrok",
-    value: `Ngrok is not running`,
-  };
-
-  if (tunnel) {
-    if (Ngrok.isMcTunnel(tunnel)) {
-      ngrokReply.value = `Ngrok running at ${tunnel.public_url}`;
-    } else {
-      ngrokReply.value = "Another application is using Ngrok now";
-    }
-  }
 
   return updater.message({
     description: `Command ${subcommand}:`,
-    field: [serverReply, ngrokReply],
+    field: [serverReply],
     actionRow: getButton(status),
   });
 }
@@ -180,25 +165,17 @@ const executor: {
   [key in Subcommand]: (subcommand: Subcommand) => Promise<BaseMessageOptions>;
 } = {
   [Subcommand.Start]: async (subcommand) => {
-    const [status, tunnel] = await Promise.all([
-      server.start(updater),
-      ngrok.start(),
-    ]);
-    return getReply(subcommand, status, tunnel);
+    const [status] = await Promise.all([server.start(updater)]);
+    return getReply(subcommand, status);
   },
   [Subcommand.Stop]: async (subcommand) => {
-    let [status, tunnel] = await Promise.all([server.stop(), ngrok.status()]);
-    if (tunnel && Ngrok.isMcTunnel(tunnel)) {
-      tunnel = await ngrok.stop();
-    }
-    return getReply(subcommand, status, tunnel);
+    let [status] = await Promise.all([server.stop()]);
+
+    return getReply(subcommand, status);
   },
   [Subcommand.Status]: async (subcommand) => {
-    const [status, tunnel] = await Promise.all([
-      server.status(),
-      ngrok.status(),
-    ]);
-    return getReply(subcommand, status, tunnel);
+    const [status] = await Promise.all([server.status()]);
+    return getReply(subcommand, status);
   },
   [Subcommand.List]: async (subcommand): Promise<BaseMessageOptions> => {
     const status = await server.status();

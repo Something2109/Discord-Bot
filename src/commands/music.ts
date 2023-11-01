@@ -54,7 +54,7 @@ const data = new SlashCommandBuilder()
       .addStringOption((option) =>
         option
           .setName("url")
-          .setDescription("The Youtube url")
+          .setDescription("The Youtube url or the keywords")
           .setRequired(true)
       )
   )
@@ -142,7 +142,7 @@ function getReplyFromList(
   if (audio instanceof Array && audio.length > 0) {
     return updater.message({
       description: onExist,
-      field: player.list.map((info, index) => ({
+      field: audio.map((info, index) => ({
         name: `${index + 1}. ${info.title}`,
         value: info.url,
       })),
@@ -159,7 +159,7 @@ const executor: {
   [Subcommand.Add]: async (interaction) => {
     const url = interaction.options.getString("url");
     const newAudio = await player.add(url);
-    return getReplyFromInfo(newAudio, "Add a song:", "Invalid song");
+    return getReplyFromList(newAudio, "Add a song:", "Invalid link");
   },
   [Subcommand.Remove]: async (interaction) => {
     const number = interaction.options.getNumber("number");
@@ -172,7 +172,7 @@ const executor: {
   },
   [Subcommand.Leave]: async (interaction) => {
     player.stop();
-    await connection.leave();
+    connection.leave();
     return updater.message({ description: "Left the voice channel" });
   },
   [Subcommand.Skip]: async (interaction) => {
@@ -237,16 +237,20 @@ const executor: {
 async function execute(interaction: InteractionType) {
   await interaction.deferReply();
 
-  updater.channel = interaction.channel as TextBasedChannel;
+  const subcommand = interaction.options.getSubcommand() as Subcommand;
+  let status = subcommand === Subcommand.Leave;
 
-  const member = interaction.member as GuildMember;
-  const userVoiceChannel = member.voice.channel as VoiceBasedChannel;
-  const status = connection.connect(userVoiceChannel);
-  if (status) {
-    connection.subcribe = player.player;
+  if (!status) {
+    updater.channel = interaction.channel as TextBasedChannel;
+
+    const member = interaction.member as GuildMember;
+    const userVoiceChannel = member.voice.channel as VoiceBasedChannel;
+    status = connection.connect(userVoiceChannel);
+    if (status) {
+      connection.subcribe = player.player;
+    }
   }
 
-  const subcommand = interaction.options.getSubcommand() as Subcommand;
   const message: BaseMessageOptions = status
     ? await executor[subcommand](interaction)
     : updater.message({

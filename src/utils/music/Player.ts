@@ -5,8 +5,8 @@ import {
   AudioPlayerState as State,
   AudioPlayerError as Error,
 } from "@discordjs/voice";
-import ytdl from "ytdl-core";
 import { Updater } from "../Updater";
+import { Youtube } from "./Youtube";
 
 interface Player {
   /**
@@ -23,7 +23,7 @@ interface Player {
    * @param channel The channel of the sent request to send update.
    * @returns The Audio info of the song added to the queue or undefined.
    */
-  add(url: string | null): Promise<AudioInfo | undefined>;
+  add(url: string | null): Promise<AudioInfo[]>;
 
   /**
    * Remove a song from the queue.
@@ -82,7 +82,7 @@ interface Player {
 
 interface AudioInfo {
   url: string;
-  length: number;
+  length?: number;
   title: string;
 }
 
@@ -91,6 +91,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
   private playing?: AudioInfo;
   private queue: Array<AudioInfo>;
   private updater: Updater;
+  private audioDownloader: Youtube;
 
   constructor(updater: Updater) {
     super();
@@ -103,6 +104,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
     this.playing = undefined;
     this.queue = new Array<AudioInfo>();
     this.updater = updater;
+    this.audioDownloader = new Youtube();
   }
 
   /**
@@ -121,7 +123,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
    * @param error the player error.
    */
   private onError(error: Error) {
-    console.error(`Audio Player Error: ${error.message} with resources`);
+    console.error(`[PLR]: Audio Player Error: ${error.message} with resources`);
     this.updater.send({
       description: `Error when playing ${this.playing?.title}: ${error.message}`,
     });
@@ -154,10 +156,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
    */
   public play() {
     if (this.playing) {
-      const stream = ytdl(this.playing.url, {
-        filter: "audioonly",
-        highWaterMark: this.playing.length * 1024 * 1024,
-      });
+      const stream = this.audioDownloader.source(this.playing.url);
       if (stream) {
         const resource = createAudioResource(stream);
         super.play(resource);
@@ -165,54 +164,27 @@ class DefaultPlayer extends AudioPlayer implements Player {
     }
   }
 
-  /**
-   * Validate the url string if it's a youtube link.
-   * @param url The url to validate.
-   * @returns The input url of undefined if not.
-   */
-  private validateUrl(url: string | null): string | undefined {
-    let regExp =
-      /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
-    if (url?.match(regExp)) {
-      return url;
-    }
-    return undefined;
-  }
-
-  /**
-   * Get the video info from url.
-   * @param url The video url.
-   * @returns The audio info object.
-   */
-  private async getVideoInfo(url: string): Promise<AudioInfo> {
-    const info: ytdl.videoInfo = await ytdl.getBasicInfo(url);
-    return {
-      url,
-      title: info.videoDetails.title,
-      length: Math.ceil(parseInt(info.videoDetails.lengthSeconds) / 60),
-    };
-  }
-
   public get player(): AudioPlayer {
     return this;
   }
 
-  public async add(url: string | null): Promise<AudioInfo | undefined> {
-    if (url && this.validateUrl(url)) {
+  public async add(str: string | null): Promise<AudioInfo[]> {
+    if (str) {
       try {
-        const NewAudio = await this.getVideoInfo(url);
-        if (!this.playing) {
-          this.playing = NewAudio;
-          this.play();
-        } else {
-          this.queue.push(NewAudio);
+        const NewAudio = await new Youtube().get(str);
+        if (NewAudio) {
+          this.queue = this.queue.concat(NewAudio);
+          if (!this.playing) {
+            this.playing = this.queue.shift();
+            this.play();
+          }
         }
         return NewAudio;
       } catch (error) {
         console.log(error);
       }
     }
-    return undefined;
+    return [];
   }
 
   public remove(number: number | null): AudioInfo | undefined {

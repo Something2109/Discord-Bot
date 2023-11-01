@@ -11,14 +11,14 @@ import {
   ActionRowBuilder,
   TextBasedChannel,
 } from "discord.js";
-import { Server, ServerStatus } from "../utils/mc-server/Server";
-import { Updater, MessageAPI } from "../utils/Updater";
+import { DefaultServer, Server, ServerStatus } from "../utils/mc-server/Server";
+import { Updater, DefaultUpdater, MessageAPI } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 
 let previousMsg: Message | undefined = undefined;
-const updater: Updater = new Updater("Minecraft Server");
-const server = new Server();
+const updater: Updater = new DefaultUpdater("Minecraft Server");
+const server: Server = new DefaultServer(updater);
 
 enum Subcommand {
   Start = "start",
@@ -165,16 +165,16 @@ const executor: {
   [key in Subcommand]: (subcommand: Subcommand) => Promise<BaseMessageOptions>;
 } = {
   [Subcommand.Start]: async (subcommand) => {
-    const [status] = await Promise.all([server.start(updater)]);
+    const status = await server.start();
     return getReply(subcommand, status);
   },
   [Subcommand.Stop]: async (subcommand) => {
-    let [status] = await Promise.all([server.stop()]);
+    const status = await server.stop();
 
     return getReply(subcommand, status);
   },
   [Subcommand.Status]: async (subcommand) => {
-    const [status] = await Promise.all([server.status()]);
+    const status = await server.status();
     return getReply(subcommand, status);
   },
   [Subcommand.List]: async (subcommand): Promise<BaseMessageOptions> => {

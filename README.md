@@ -23,4 +23,4 @@
 
 ## Run
 
-To start the bot, run the command `npm run start` in the directory of the bot. Make sure the bot update all the command to the discord remote server.
+To start the bot, run the command `npm run start` in the directory of the bot. Make sure the bot update all the commands to the discord remote server.

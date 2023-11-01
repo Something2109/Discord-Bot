@@ -1,11 +1,84 @@
 import {
   AudioPlayer,
-  createAudioPlayer,
   createAudioResource,
-  AudioPlayerStatus,
+  AudioPlayerStatus as Status,
+  AudioPlayerState as State,
+  AudioPlayerError as Error,
 } from "@discordjs/voice";
 import ytdl from "ytdl-core";
 import { Updater } from "../Updater";
+
+interface Player {
+  /**
+   * Get the audio player to subcribe to the voice connection.
+   * @returns The player.
+   */
+  get player(): AudioPlayer;
+
+  /**
+   * Add a song to the player queue.
+   * @param url The link of the Youtube song.
+   * @param title The title to represent in the list.
+   * @param length The length of the song to allocate the buffer.
+   * @param channel The channel of the sent request to send update.
+   * @returns The Audio info of the song added to the queue or undefined.
+   */
+  add(url: string | null): Promise<AudioInfo | undefined>;
+
+  /**
+   * Remove a song from the queue.
+   * @param {number} number The number of the song in the queue.
+   * @returns the audio info of the song removed from the queue or undefined.
+   */
+  remove(number: number | null): AudioInfo | undefined;
+
+  /**
+   * Skip the playing song.
+   * @returns The audio info of the skipped song.
+   */
+  skip(): AudioInfo | undefined;
+
+  /**
+   * Stop the player from continue playing.
+   */
+  stop(force?: boolean): boolean;
+
+  /**
+   * Get a list of the songs in the queue.
+   * @returns The audio info array of the songs in the queue.
+   */
+  get list(): Array<AudioInfo>;
+
+  /**
+   * Clear the player queue.
+   * @returns The old queue.
+   */
+  clearqueue(): Array<AudioInfo>;
+
+  /**
+   * Pause the player.
+   * @returns The reply string.
+   */
+  pause(): boolean;
+
+  /**
+   * Make the player continue to play.
+   * @returns The reply string.
+   */
+  unpause(): boolean;
+
+  /**
+   * Make the player starts playing loop.
+   * @returns The audio info of the current (loop) song.
+   */
+  loop(): AudioInfo | undefined;
+
+  /**
+   * Make the player stops playing loop.
+   * @returns The audio info of the current song.
+   */
+  unloop(): AudioInfo | undefined;
+}
 
 interface AudioInfo {
   url: string;
@@ -13,48 +86,73 @@ interface AudioInfo {
   title: string;
 }
 
-class Player {
-  private _audioPlayer: AudioPlayer;
+class DefaultPlayer extends AudioPlayer implements Player {
   private looping: boolean;
   private playing?: AudioInfo;
   private queue: Array<AudioInfo>;
+  private updater: Updater;
 
   constructor(updater: Updater) {
-    this._audioPlayer = createAudioPlayer()
-      .on("stateChange", (oldState, newState) => {
-        console.log(
-          `Player transitioned from ${oldState.status} to ${newState.status}`
-        );
-      })
-      .on("error", (error) => {
-        console.error(`Audio Player Error: ${error.message} with resources`);
-        updater.send({
-          description: `Error when playing ${this.playing?.title}: ${error.message}`,
-        });
-      })
-      .on(AudioPlayerStatus.Idle, () => {
-        if (this.looping) {
-          this.play();
-        } else {
-          this.playing = this.queue.shift();
-          this.play();
-        }
-      })
-      .on(AudioPlayerStatus.Playing, () => {
-        updater.send({
-          description: `Playing ${this.playing?.title}`,
-          url: this.playing?.url,
-        });
-      });
+    super();
+
+    this.on("stateChange", this.onStageChange)
+      .on("error", this.onError)
+      .on(Status.Idle, this.onIdle)
+      .on(Status.Playing, this.onPlaying);
     this.looping = false;
     this.playing = undefined;
     this.queue = new Array<AudioInfo>();
+    this.updater = updater;
+  }
+
+  /**
+   * Function executed when player state changes.
+   * @param oldState The old state of the player.
+   * @param newState The new state of the player.
+   */
+  private onStageChange(oldState: State, newState: State) {
+    console.log(
+      `[PLR]: Player transitioned from ${oldState.status} to ${newState.status}`
+    );
+  }
+
+  /**
+   * Function executed when error happened.
+   * @param error the player error.
+   */
+  private onError(error: Error) {
+    console.error(`Audio Player Error: ${error.message} with resources`);
+    this.updater.send({
+      description: `Error when playing ${this.playing?.title}: ${error.message}`,
+    });
+  }
+
+  /**
+   * Function executed when the player changes to idle state.
+   */
+  private onIdle() {
+    if (this.looping) {
+      this.play();
+    } else {
+      this.playing = this.queue.shift();
+      this.play();
+    }
+  }
+
+  /**
+   * Function executed when the player changes to playing state.
+   */
+  private onPlaying() {
+    this.updater.send({
+      description: `Playing ${this.playing?.title}`,
+      url: this.playing?.url,
+    });
   }
 
   /**
    * Play the song saved in the #playing field.
    */
-  private play() {
+  public play() {
     if (this.playing) {
       const stream = ytdl(this.playing.url, {
         filter: "audioonly",
@@ -62,7 +160,7 @@ class Player {
       });
       if (stream) {
         const resource = createAudioResource(stream);
-        this._audioPlayer.play(resource);
+        super.play(resource);
       }
     }
   }
@@ -75,14 +173,17 @@ class Player {
   private validateUrl(url: string | null): string | undefined {
     let regExp =
       /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})(?:\S+)?$/;
-    let regExp2 =
-      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\?v=)([^#\&\?]*).*/;
-    if (url?.match(regExp) || url?.match(regExp2)) {
+    if (url?.match(regExp)) {
       return url;
     }
     return undefined;
   }
 
+  /**
+   * Get the video info from url.
+   * @param url The video url.
+   * @returns The audio info object.
+   */
   private async getVideoInfo(url: string): Promise<AudioInfo> {
     const info: ytdl.videoInfo = await ytdl.getBasicInfo(url);
     return {
@@ -92,18 +193,10 @@ class Player {
     };
   }
 
-  public get audioPlayer(): AudioPlayer {
-    return this._audioPlayer;
+  public get player(): AudioPlayer {
+    return this;
   }
 
-  /**
-   * Add a song to the player queue.
-   * @param url The link of the Youtube song.
-   * @param title The title to represent in the list.
-   * @param length The length of the song to allocate the buffer.
-   * @param channel The channel of the sent request to send update.
-   * @returns The Audio info of the song added to the queue or undefined.
-   */
   public async add(url: string | null): Promise<AudioInfo | undefined> {
     if (url && this.validateUrl(url)) {
       try {
@@ -122,11 +215,6 @@ class Player {
     return undefined;
   }
 
-  /**
-   * Remove a song from the queue.
-   * @param {number} number The number of the song in the queue.
-   * @returns the audio info of the song removed from the queue or undefined.
-   */
   public remove(number: number | null): AudioInfo | undefined {
     if (number && number > 0 && number <= this.queue.length) {
       let removed = this.queue.splice(number - 1, 1);
@@ -135,76 +223,37 @@ class Player {
     return undefined;
   }
 
-  /**
-   * Skip the playing song.
-   * @returns The audio info of the skipped song.
-   */
   public skip(): AudioInfo | undefined {
     const oldSong = this.playing;
-    this._audioPlayer.stop(true);
+    super.stop(true);
     return oldSong;
   }
 
-  /**
-   * Stop the player from continue playing.
-   */
-  public stop() {
+  public stop(force?: boolean) {
     this.clearqueue();
     this.playing = undefined;
-    this._audioPlayer.stop(true);
+    return super.stop(true);
   }
 
-  /**
-   * Get a list of the songs in the queue.
-   * @returns The audio info array of the songs in the queue.
-   */
   public get list() {
     return this.queue;
   }
 
-  /**
-   * Clear the player queue.
-   * @returns The old queue.
-   */
   public clearqueue() {
     const oldQueue = this.queue;
     this.queue = [];
     return oldQueue;
   }
 
-  /**
-   * Pause the player.
-   * @returns The reply string.
-   */
-  public pause(): boolean {
-    return this._audioPlayer.pause();
-  }
-
-  /**
-   * Make the player continue to play.
-   * @returns The reply string.
-   */
-  public unpause(): boolean {
-    return this._audioPlayer.unpause();
-  }
-
-  /**
-   * Make the player starts playing loop.
-   * @returns The audio info of the current (loop) song.
-   */
   loop(): AudioInfo | undefined {
     this.looping = true;
     return this.playing;
   }
 
-  /**
-   * Make the player stops playing loop.
-   * @returns The audio info of the current song.
-   */
   unloop(): AudioInfo | undefined {
     this.looping = false;
     return this.playing;
   }
 }
 
-export { Player, AudioInfo };
+export { Player, DefaultPlayer, AudioInfo };

@@ -3,13 +3,13 @@ import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
 } from "discord.js";
-import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
-import { Updater } from "../utils/Updater";
+import { DefaultNgrok, Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
+import { DefaultUpdater, Updater } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction;
 
-const updater = new Updater("Ngrok");
-const ngrok = new Ngrok();
+const updater: Updater = new DefaultUpdater("Ngrok");
+const ngrok: Ngrok = new DefaultNgrok();
 
 enum Subcommand {
   Start = "start",
@@ -70,11 +70,10 @@ function getReply(
 
 const executor: {
   [key in Subcommand]: (
-    interaction: InteractionType,
-    subcommand: Subcommand
+    interaction: InteractionType
   ) => Promise<BaseMessageOptions>;
 } = {
-  [Subcommand.Start]: async (interaction, subcommand) => {
+  [Subcommand.Start]: async (interaction) => {
     const address = interaction.options.getString("addr");
     const tunnel = address ? await ngrok.start(address) : undefined;
 
@@ -86,11 +85,11 @@ const executor: {
             : "Cannot start tunnel.",
         });
   },
-  [Subcommand.Status]: async (interaction, subcommand) => {
+  [Subcommand.Status]: async (interaction) => {
     const tunnel = await ngrok.status();
     return getReply(tunnel, "Tunnel:", "There's no tunnel running");
   },
-  [Subcommand.Stop]: async (interaction, subcommand) => {
+  [Subcommand.Stop]: async (interaction) => {
     const tunnel = await ngrok.stop();
     return getReply(
       tunnel,
@@ -105,7 +104,7 @@ async function execute(interaction: InteractionType) {
 
   const subcommand = interaction.options.getSubcommand() as Subcommand;
 
-  const reply = await executor[subcommand](interaction, subcommand);
+  const reply = await executor[subcommand](interaction);
   await interaction.editReply(reply);
 }
 

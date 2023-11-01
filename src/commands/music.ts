@@ -6,15 +6,15 @@ import {
   TextBasedChannel,
   VoiceBasedChannel,
 } from "discord.js";
-import { Updater } from "../utils/Updater";
-import { AudioInfo, Player } from "../utils/music/Player";
-import { Connection } from "../utils/music/Connection";
+import { Updater, DefaultUpdater } from "../utils/Updater";
+import { AudioInfo, DefaultPlayer, Player } from "../utils/music/Player";
+import { Connection, DefaultConnection } from "../utils/music/Connection";
 
 type InteractionType = ChatInputCommandInteraction;
 
-const updater = new Updater("Music Player");
-const player = new Player(updater);
-const connection = new Connection();
+const updater: Updater = new DefaultUpdater("Music Player");
+const player: Player = new DefaultPlayer(updater);
+const connection: Connection = new DefaultConnection();
 
 enum Subcommand {
   Add = "add",
@@ -243,7 +243,7 @@ async function execute(interaction: InteractionType) {
   const userVoiceChannel = member.voice.channel as VoiceBasedChannel;
   const status = connection.connect(userVoiceChannel);
   if (status) {
-    connection.subcribe = player;
+    connection.subcribe = player.player;
   }
 
   const subcommand = interaction.options.getSubcommand() as Subcommand;

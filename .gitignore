@@ -1,5 +1,6 @@
 .env
 *.js
 *.map
+*.d.ts
 node_modules
 out

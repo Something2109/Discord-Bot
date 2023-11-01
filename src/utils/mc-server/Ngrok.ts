@@ -1,3 +1,39 @@
+/**
+ * Ngrok interface to use in other classes or functions.
+ * All the functions return the tunnel object if these is a tunnel running
+ * or undefined if these is none.
+ * Implement this to use in other default classes.
+ */
+interface Ngrok {
+  /**
+   * Check the running tunnel and create one if none running.
+   * @returns the tunnel running or created.
+   */
+  start(address?: string): Promise<NgrokTunnel | undefined>;
+
+  /**
+   * Get the running Ngrok tunnel.
+   * @return the running tunnel or undefined if none running.
+   */
+  status(): Promise<NgrokTunnel | undefined>;
+
+  /**
+   * Stop the running Ngrok tunnel.
+   * @returns Undefined if successful or the current running tunnel if failed
+   */
+  stop(): Promise<NgrokTunnel | undefined>;
+
+  /**
+   * Check if the tunnel is the minecraft tunnel.
+   * @param tunnel The tunnel to check.
+   * @returns The boolean specified the result.
+   */
+  isMcTunnel(tunnel: NgrokTunnel | undefined): boolean;
+}
+
+/**
+ * The interface contains basic info of the Ngrok tunnel.
+ */
 interface NgrokTunnel {
   name: string;
   ID: string;
@@ -9,24 +45,27 @@ interface NgrokTunnel {
 }
 
 /**
- * Ngrok object used to interact with the Ngrok service.
- * All the functions return the tunnel object if these is a tunnel running
- * or undefined if these is none.
+ * Default Ngrok class used to interact with the Ngrok service.
  */
-class Ngrok {
-  private static readonly controlUrl = process.env.NGROK_CONTROL_URL
-    ? `http://${process.env.NGROK_CONTROL_URL}/api/tunnels`
-    : `http://localhost:4040/api/tunnels`;
-  private static readonly mcTunnel = `${
-    process.env.MC_HOST ? process.env.MC_HOST : "localhost"
-  }:${process.env.MC_PORT ? process.env.MC_PORT : "25565"}`;
+class DefaultNgrok implements Ngrok {
+  private readonly controlUrl: string;
+  private readonly mcTunnel: string;
 
-  /**
-   * Check the running tunnel and create one if none running.
-   * @returns the tunnel running or created.
-   */
+  constructor(
+    controlUrl: string | undefined = process.env.NGROK_CONTROL_URL,
+    mcHost: string | undefined = process.env.MC_HOST,
+    mcPort: string | undefined = process.env.MC_PORT
+  ) {
+    this.controlUrl = controlUrl
+      ? `http://${controlUrl}/api/tunnels`
+      : `http://localhost:4040/api/tunnels`;
+    this.mcTunnel = `${mcHost ? mcHost : "localhost"}:${
+      mcPort ? mcPort : "25565"
+    }`;
+  }
+
   public async start(
-    address: string = Ngrok.mcTunnel
+    address: string = this.mcTunnel
   ): Promise<NgrokTunnel | undefined> {
     let tunnel = await this.status();
     if (!tunnel) {
@@ -34,14 +73,11 @@ class Ngrok {
     }
     return tunnel;
   }
-  /**
-   * Get the running Ngrok tunnel.
-   * @return the running tunnel or undefined if none running.
-   */
+
   public async status(): Promise<NgrokTunnel | undefined> {
     let tunnel = undefined;
     try {
-      let response = await fetch(Ngrok.controlUrl, {
+      let response = await fetch(this.controlUrl, {
         method: "GET",
       });
       if (response.ok) {
@@ -56,15 +92,12 @@ class Ngrok {
     }
     return tunnel;
   }
-  /**
-   * Stop the running Ngrok tunnel.
-   * @returns Undefined if successful or the current running tunnel if failed
-   */
+
   public async stop(): Promise<NgrokTunnel | undefined> {
     let tunnel: NgrokTunnel | undefined = await this.status();
     if (tunnel) {
       try {
-        let response = await fetch(`${Ngrok.controlUrl}/${tunnel.name}`, {
+        let response = await fetch(`${this.controlUrl}/${tunnel.name}`, {
           method: "DELETE",
         });
         if (response.ok) {
@@ -76,21 +109,18 @@ class Ngrok {
     }
     return tunnel;
   }
-  /**
-   * Check if the tunnel is the minecraft tunnel.
-   * @param tunnel The tunnel to check.
-   * @returns The boolean specified the result.
-   */
-  public static isMcTunnel(tunnel: NgrokTunnel): boolean {
-    return tunnel?.config.addr === Ngrok.mcTunnel;
+
+  public isMcTunnel(tunnel: NgrokTunnel | undefined): boolean {
+    return tunnel?.config.addr === this.mcTunnel;
   }
+
   /**
    * Create a ngrok tunnel to the minecraft server port.
    * @returns the tunnel started or undefined if error happens.
    */
   private async create(address: string): Promise<NgrokTunnel | undefined> {
     try {
-      let response = await fetch(Ngrok.controlUrl, {
+      let response = await fetch(this.controlUrl, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -113,4 +143,4 @@ class Ngrok {
   }
 }
 
-export { Ngrok, NgrokTunnel };
+export { Ngrok, DefaultNgrok, NgrokTunnel };

@@ -3,9 +3,52 @@ import { Updater } from "../Updater";
 import path from "node:path";
 
 /**
- * Minecraft server object used to control the minecraft server.
+ * Server interface to use in other classes or functions.
+ * Used to control the minecraft server.
+ * Implement this to use in other default classes.
  */
-class Server {
+interface Server {
+  /**
+   * Start the Minecraft server.
+   * @returns The server status showing the state of the server.
+   */
+  start(): Promise<ServerStatus>;
+
+  /**
+   * Check if these is a connection to server.
+   * @returns The server status showing the state of connection
+   */
+  status(): Promise<ServerStatus>;
+
+  /**
+   * The list of the players.
+   */
+  get list(): Array<PlayerInfo>;
+  /**
+   * Stop the minecraftv server.
+   * @returns The server status showing the state of the server.
+   */
+  stop(): Promise<ServerStatus>;
+}
+
+/**
+ * Server status.
+ */
+enum ServerStatus {
+  Online,
+  Offline,
+  Starting,
+}
+
+interface PlayerInfo {
+  name: string;
+  time: Date;
+}
+
+/**
+ * Minecraft server class used to control the minecraft server.
+ */
+class DefaultServer implements Server {
   private readonly directory: string | undefined;
   private readonly arguments: Array<string>;
   private readonly timeoutMin: number;
@@ -14,8 +57,9 @@ class Server {
   private starting: boolean;
   private players: Array<PlayerInfo>;
   private stopTimeout?: NodeJS.Timeout;
+  private updater: Updater;
 
-  constructor() {
+  constructor(updater: Updater) {
     [this.directory, ...this.arguments] = this.pathResolver();
     this.timeoutMin = process.env.MC_TIMEOUT
       ? parseFloat(process.env.MC_TIMEOUT)
@@ -24,19 +68,16 @@ class Server {
     this.process = undefined;
     this.starting = false;
     this.players = new Array();
+    this.updater = updater;
   }
 
-  /**
-   * Start the Minecraft server.
-   * @returns The server status showing the state of the server.
-   */
-  public async start(updater: Updater): Promise<ServerStatus> {
+  public async start(): Promise<ServerStatus> {
     let connection = await this.status();
     try {
       if (connection == ServerStatus.Offline) {
         this.starting = true;
 
-        this.spawnServer(updater);
+        this.spawnServer();
 
         connection = ServerStatus.Starting;
       }
@@ -47,10 +88,6 @@ class Server {
     return connection;
   }
 
-  /**
-   * Check if these is a connection to server.
-   * @returns The server status showing the state of connection
-   */
   public async status(): Promise<ServerStatus> {
     let status = ServerStatus.Starting;
     if (!this.starting) {
@@ -121,30 +158,110 @@ class Server {
    * Run the server in the server directory given in the .env file.
    * @param updater The updater to update important info to the user.
    */
-  private spawnServer(updater: Updater) {
+  private spawnServer() {
     this.process = spawn("java", this.arguments, {
       cwd: this.directory,
     });
     if (this.process) {
-      this.process.stdout?.on("data", (data: any) => {
-        const dataStr: string = data.toString();
-        const rawMessages = dataStr.split("\n").filter((value) => value.length);
-        rawMessages.forEach((message) => {
-          console.log(`[MCS] ${message}`);
-          this.update(updater, message);
+      this.process.stdout?.on("data", this.onData.bind(this));
+      this.process.stderr?.on("data", this.onError.bind(this));
+      this.process.on("close", this.onClose.bind(this));
+    }
+  }
+
+  /**
+   * Function executed when there is output from the server.
+   * @param data The data from the output stream of the server process.
+   */
+  private onData(data: any) {
+    const dataStr: string = data.toString();
+    const rawMessages = dataStr.split("\n").filter((value) => value.length);
+    rawMessages.forEach((rawMessage) => {
+      console.log(`[MCS] ${rawMessage}`);
+      if (this.starting) {
+        this.onStarting(rawMessage);
+      } else if (!rawMessage.match(/<[a-zA-Z0-9_]{2,16}>/)) {
+        this.onRunning(rawMessage);
+      }
+    });
+  }
+
+  /**
+   * Execute messages when the server is in starting state.
+   * @param rawMessage The message string.
+   */
+  private onStarting(rawMessage: string) {
+    if (rawMessage.includes("Done")) {
+      this.starting = false;
+      this.updater.send({
+        description: "Server starts successfully",
+      });
+      this.stopTimeoutManager();
+    }
+  }
+
+  /**
+   * Execute messages when the server is in running state.
+   * @param rawMessage The message string.
+   */
+  private onRunning(rawMessage: string) {
+    const message = rawMessage
+      .replace(/\[(\d|\:)*\] \[(\d|\w| |\/|\:|\#|\-)*\]\:/, "")
+      .trim();
+
+    if (message.includes("joined") || message.includes("left")) {
+      this.updater.send({
+        description: message,
+      });
+      const playerName = message.split(" ", 1)[0];
+
+      message.includes("joined")
+        ? this.addPlayerToList(playerName)
+        : this.removePlayerFromList(playerName);
+
+      this.stopTimeoutManager();
+    }
+  }
+
+  /**
+   * Function executed when the server process is closed.
+   */
+  private onClose() {
+    this.updater.send({
+      description: "Server stops successfully",
+    });
+    this.killServer();
+  }
+
+  /**
+   * Function executed when there is error from the server.
+   * @param data The data error string.
+   */
+  private onError(data: any) {
+    console.error(`[MCS]: Error: ${data}`);
+    this.updater.send({ description: "Server encounters error" });
+    this.killServer();
+  }
+
+  /**
+   * Handle the timeout counter to close the server when there is no player playing.
+   */
+  private stopTimeoutManager() {
+    if (this.players.length == 0 && !this.stopTimeout) {
+      this.updater.send({
+        description: `Server has no player playing, close in ${this.timeoutMin} minutes`,
+      });
+
+      this.stopTimeout = setTimeout(() => {
+        this.updater.send({
+          description: "Server is stopping due to no player playing",
         });
-      });
-      this.process.stderr?.on("data", (data: any) => {
-        console.error(`[MCS]: Error: ${data}`);
-        updater.send({ description: "Server encounters error" });
-        this.killServer();
-      });
-      this.process.on("close", () => {
-        updater.send({
-          description: "Server stops successfully",
-        });
-        this.killServer();
-      });
+        this.stop();
+      }, this.timeoutMin * 60000);
+    } else if (this.players.length > 0 && this.stopTimeout) {
+      clearTimeout(this.stopTimeout);
+
+      this.stopTimeout = undefined;
     }
   }
 
@@ -190,70 +307,6 @@ class Server {
     clearTimeout(this.stopTimeout);
     this.stopTimeout = undefined;
   }
-
-  /**
-   * Update the important info to the user.
-   * @param updater The updater to update the info.
-   * @param rawMessage The raw message from the minecraft server.
-   */
-  private update(updater: Updater, rawMessage: string) {
-    const message = rawMessage
-      .replace(/\[(\d|\:)*\] \[(\d|\w| |\/|\:|\#|\-)*\]\:/, "")
-      .trim();
-
-    if (this.starting) {
-      if (message.includes("Done")) {
-        this.starting = false;
-        updater.send({
-          description: "Server starts successfully",
-        });
-        this.stopTimeoutManager(updater);
-      }
-    } else if (!message.match(/<[a-zA-Z0-9_]{2,16}>/)) {
-      if (message.includes("joined") || message.includes("left")) {
-        updater.send({
-          description: message,
-        });
-        const playerName = message.split(" ", 1)[0];
-
-        message.includes("joined")
-          ? this.addPlayerToList(playerName)
-          : this.removePlayerFromList(playerName);
-
-        this.stopTimeoutManager(updater);
-      }
-    }
-  }
-
-  private stopTimeoutManager(updater: Updater) {
-    if (this.players.length == 0 && !this.stopTimeout) {
-      updater.send({
-        description: `Server has no player playing, close in ${this.timeoutMin} minutes`,
-      });
-
-      this.stopTimeout = setTimeout(() => {
-        updater.send({
-          description: "Server is stopping due to no player playing",
-        });
-        this.stop();
-      }, this.timeoutMin * 60000);
-    } else if (this.players.length > 0 && this.stopTimeout) {
-      clearTimeout(this.stopTimeout);
-
-      this.stopTimeout = undefined;
-    }
-  }
 }
 
-enum ServerStatus {
-  Online,
-  Offline,
-  Starting,
-}
-
-interface PlayerInfo {
-  name: string;
-  time: Date;
-}
-
-export { Server, ServerStatus };
+export { Server, DefaultServer, ServerStatus, PlayerInfo };

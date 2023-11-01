@@ -11,16 +11,16 @@ import {
   ActionRowBuilder,
   TextBasedChannel,
 } from "discord.js";
-import { Server, ServerStatus } from "../utils/mc-server/Server";
-import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
-import { Updater, MessageAPI } from "../utils/Updater";
+import { DefaultServer, Server, ServerStatus } from "../utils/mc-server/Server";
+import { DefaultNgrok, Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
+import { Updater, DefaultUpdater, MessageAPI } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 
 let previousMsg: Message | undefined = undefined;
-const updater: Updater = new Updater("Minecraft Server");
-const server = new Server();
-const ngrok = new Ngrok();
+const updater: Updater = new DefaultUpdater("Minecraft Server");
+const server: Server = new DefaultServer(updater);
+const ngrok: Ngrok = new DefaultNgrok();
 
 enum Subcommand {
   Start = "start",
@@ -140,7 +140,7 @@ function getReply(
   };
 
   if (tunnel) {
-    if (Ngrok.isMcTunnel(tunnel)) {
+    if (ngrok.isMcTunnel(tunnel)) {
       ngrokReply.value = `Ngrok running at ${tunnel.public_url}`;
     } else {
       ngrokReply.value = "Another application is using Ngrok now";
@@ -180,15 +180,12 @@ const executor: {
   [key in Subcommand]: (subcommand: Subcommand) => Promise<BaseMessageOptions>;
 } = {
   [Subcommand.Start]: async (subcommand) => {
-    const [status, tunnel] = await Promise.all([
-      server.start(updater),
-      ngrok.start(),
-    ]);
+    const [status, tunnel] = await Promise.all([server.start(), ngrok.start()]);
     return getReply(subcommand, status, tunnel);
   },
   [Subcommand.Stop]: async (subcommand) => {
     let [status, tunnel] = await Promise.all([server.stop(), ngrok.status()]);
-    if (tunnel && Ngrok.isMcTunnel(tunnel)) {
+    if (ngrok.isMcTunnel(tunnel)) {
       tunnel = await ngrok.stop();
     }
     return getReply(subcommand, status, tunnel);

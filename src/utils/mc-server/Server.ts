@@ -149,7 +149,7 @@ class DefaultServer implements Server {
       fileName
     );
     if (!(process.env.MC_GUI === "true")) {
-      this.arguments.push("-nogui");
+      result.push("-nogui");
     }
     return result;
   }

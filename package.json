@@ -11,6 +11,11 @@
   },
   "scripts": {
     "start": "node app.js",
-    "compile": "npx tsc"
+    "compile": "tsc",
+    "test": "mocha"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.4",
+    "mocha": "^10.2.0"
   }
 }

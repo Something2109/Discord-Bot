@@ -74,9 +74,6 @@ class DefaultServer implements Server {
     this.timeoutMin = process.env.MC_TIMEOUT
       ? parseFloat(process.env.MC_TIMEOUT)
       : 6;
-    this.timeoutMin = process.env.MC_TIMEOUT
-      ? parseFloat(process.env.MC_TIMEOUT)
-      : 6;
 
     this.process = undefined;
     this.starting = false;
@@ -166,7 +163,7 @@ class DefaultServer implements Server {
       fileName
     );
     if (!(process.env.MC_GUI === "true")) {
-      this.arguments.push("-nogui");
+      result.push("-nogui");
     }
     return result;
   }

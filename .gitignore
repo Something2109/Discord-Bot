@@ -1,6 +1,5 @@
 .env
-*.js
-*.map
-*.d.ts
+/database
+dist
 node_modules
 out

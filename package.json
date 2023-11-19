@@ -10,7 +10,7 @@
     "ytdl-core": "^4.10.0"
   },
   "scripts": {
-    "start": "node app.js",
+    "start": "node dist/app.js",
     "compile": "tsc",
     "test": "mocha"
   },

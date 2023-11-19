@@ -4,7 +4,12 @@ import { GatewayIntentBits } from "discord.js";
 
 // Create a new client instance
 const client = new CustomClient({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 client.readCommands();

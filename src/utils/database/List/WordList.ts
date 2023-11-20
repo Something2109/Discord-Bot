@@ -38,21 +38,34 @@ class WordList extends JsonLoader {
   /**
    * Set a banned word to database.
    */
-  set bannedWord(word: string) {
+  add(word: string) {
     const wordRanking = this.list.find((value) => value.word == word);
     if (!wordRanking) {
-      this.list.push({
+      const newWord = {
         word,
         list: [],
-      });
+      };
+      this.list.push(newWord);
+      return word;
     }
+    return undefined;
   }
 
+  wordList() {
+    return this.wordRanking();
+  }
+
+  /**
+   * Remove a word from the list.
+   * @param word The word to remove.
+   */
   remove(word: string) {
     const wordRanking = this.list.find((value) => value.word == word);
     if (wordRanking) {
       this.list.splice(this.list.indexOf(wordRanking), 1);
+      return word;
     }
+    return undefined;
   }
 
   /**
@@ -81,23 +94,49 @@ class WordList extends JsonLoader {
    * @param userId The optional user to search.
    * @returns The ranking list of the user or word.
    */
-  ranking(word?: string, userId?: string): Ranking[] | undefined {
-    if (word && userId) {
-    }
-    if (word) {
-      return this.userRanking(word);
-    }
+  ranking(word?: string, userId?: string): Ranking[] {
     if (userId) {
       return this.wordRanking(userId);
     }
-    return this.totalRanking();
+    return this.userRanking(word);
   }
 
   /**
-   * Return the user ranking of banned words spoken.
-   * @returns The user ranking.
+   * Return the work ranking of a specific user.
+   * If no user given, it returns the global word ranking.
+   * @param userId The user to search.
+   * @returns The ranking array.
    */
-  private totalRanking() {
+  private wordRanking(userId?: string): Ranking[] {
+    const ranking: Ranking[] = [];
+
+    this.list.forEach(({ word, list }) => {
+      if (userId) {
+        const userCount = list.find((value) => (value.id = userId));
+        if (userCount) {
+          ranking.push({ word, count: userCount.count });
+        }
+      } else {
+        const wordCount = list.reduce((sum, value) => sum + value.count, 0);
+        ranking.push({ word, count: wordCount });
+      }
+    });
+
+    return ranking.sort((a, b) => b.count - a.count);
+  }
+
+  /**
+   * Return the user ranking of a specific word.
+   * If no word given, return the user ranking of banned words spoken.
+   * @param word The word to search.
+   * @returns The ranking array.
+   */
+  private userRanking(word?: string): Ranking[] {
+    if (word) {
+      const ranking = this.list.find((value) => value.word == word);
+      return ranking ? ranking.list.sort((a, b) => b.count - a.count) : [];
+    }
+
     const ranking: Ranking[] = [];
 
     this.list.forEach(({ word, list }) => {
@@ -112,35 +151,6 @@ class WordList extends JsonLoader {
     });
 
     return ranking.sort((a, b) => b.count - a.count);
-  }
-
-  /**
-   * Return the work ranking of a specific user.
-   * @param userId The user to search.
-   * @returns The ranking array.
-   */
-  private wordRanking(userId: string) {
-    const ranking: Ranking[] = [];
-
-    this.list.forEach(({ word, list }) => {
-      const userCount = list.find((value) => (value.id = userId));
-      if (userCount) {
-        ranking.push({ word, count: userCount.count });
-      }
-    });
-
-    return ranking.sort((a, b) => b.count - a.count);
-  }
-
-  /**
-   * Return the user ranking of a specific word.
-   * @param word The word to search.
-   * @returns The ranking array.
-   */
-  private userRanking(word: string): Ranking[] | undefined {
-    return this.list
-      .find((value) => value.word == word)
-      ?.list.sort((a, b) => b.count - a.count);
   }
 }
 

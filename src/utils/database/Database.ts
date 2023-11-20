@@ -18,21 +18,28 @@ class Database {
     return wordList.bannedWords;
   }
 
-  set bannedWord(word: string) {
+  add(word: string) {
     const wordList = Database.list.word as BannedWordList;
-    wordList.bannedWord = word.trim().toLowerCase();
-    this.save();
+    const result = wordList.add(word.toLowerCase());
+    if (result) this.save();
+    return result;
+  }
+
+  wordList() {
+    const wordList = Database.list.word as BannedWordList;
+    return wordList.wordList();
   }
 
   remove(word: string) {
     const wordList = Database.list.word as BannedWordList;
-    wordList.remove(word.trim().toLowerCase());
-    this.save();
+    const result = wordList.remove(word.toLowerCase());
+    if (result) this.save();
+    return result;
   }
 
-  ranking(word?: string, userId?: string): Ranking[] | undefined {
+  ranking(word?: string, userId?: string): Ranking[] {
     const wordList = Database.list.word as BannedWordList;
-    const result = wordList.ranking(word?.trim().toLowerCase(), userId);
+    const result = wordList.ranking(word?.toLowerCase(), userId);
 
     return result;
   }

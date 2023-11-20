@@ -17,6 +17,7 @@ const database = new Database();
 
 enum Subcommand {
   Add = "add",
+  List = "list",
   Remove = "remove",
   Ranking = "ranking",
 }
@@ -25,6 +26,7 @@ const description: { [key in Subcommand]: string } = {
   [Subcommand.Add]: "Add word to ban",
   [Subcommand.Remove]: "Remove word from banned list",
   [Subcommand.Ranking]: "Show the local ranking of saying banned words",
+  [Subcommand.List]: "Show the banned word list",
 };
 
 const data = new SlashCommandBuilder()
@@ -40,6 +42,11 @@ const data = new SlashCommandBuilder()
           .setDescription("The word to ban")
           .setRequired(true)
       )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName(Subcommand.List)
+      .setDescription(description[Subcommand.List])
   )
   .addSubcommand((subcommand) =>
     subcommand
@@ -77,19 +84,38 @@ const executor: {
   [key in Subcommand]: (interaction: InteractionType) => BaseMessageOptions;
 } = {
   [Subcommand.Add]: (interaction) => {
-    const word = interaction.options.getString("word");
-    database.bannedWord = word!;
+    const word = interaction.options.getString("word")?.trim();
+    const reply = database.add(word!)
+      ? `Added the word ${word} from the banned list.`
+      : `Failed to add the word`;
 
     return updater.message({
-      description: `Added the word ${word} from the banned list.`,
+      description: reply,
     });
+  },
+  [Subcommand.List]: function (interaction) {
+    const result = database.wordList();
+
+    return updater.message(
+      result.length > 0
+        ? {
+            description: "Banned word list",
+            field: toRankingList(result),
+          }
+        : {
+            description: "Empty list",
+            field: [],
+          }
+    );
   },
   [Subcommand.Remove]: (interaction) => {
     const word = interaction.options.getString("word")?.trim();
-    database.remove(word!);
+    const reply = database.remove(word!)
+      ? `Removed the word ${word} from the banned list.`
+      : `Failed to remove the word`;
 
     return updater.message({
-      description: `Removed the word ${word} from the banned list.`,
+      description: reply,
     });
   },
   [Subcommand.Ranking]: function (interaction): BaseMessageOptions {
@@ -97,16 +123,17 @@ const executor: {
     const user = interaction.options.getUser("user");
 
     const result = database.ranking(word, user?.id);
-    if (result instanceof Object) {
-      return updater.message({
-        description: "Ranking",
-        field: toRankingList(result),
-      });
-    }
-
-    return updater.message({
-      description: `The user ${user} has said ${word} ${result} times`,
-    });
+    return updater.message(
+      result.length > 0
+        ? {
+            description: "Ranking",
+            field: toRankingList(result),
+          }
+        : {
+            description: "Empty list",
+            field: [],
+          }
+    );
   },
 };
 

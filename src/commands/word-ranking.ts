@@ -3,12 +3,11 @@ import {
   BaseMessageOptions,
   ChatInputCommandInteraction,
   SlashCommandBuilder,
-  User,
   userMention,
 } from "discord.js";
 import { Updater, DefaultUpdater } from "../utils/Updater";
 import { Database } from "../utils/database/Database";
-import { Ranking } from "../utils/database/List/WordList";
+import { BannedWordList, Ranking } from "../utils/database/List/WordList";
 
 type InteractionType = ChatInputCommandInteraction;
 
@@ -30,8 +29,8 @@ const description: { [key in Subcommand]: string } = {
 };
 
 const data = new SlashCommandBuilder()
-  .setName("banned-word")
-  .setDescription("Banned word ranking")
+  .setName("word-ranking")
+  .setDescription("Tracking and ranking words")
   .addSubcommand((subcommand) =>
     subcommand
       .setName(Subcommand.Add)
@@ -39,7 +38,7 @@ const data = new SlashCommandBuilder()
       .addStringOption((option) =>
         option
           .setName("word")
-          .setDescription("The word to ban")
+          .setDescription("The word to track")
           .setRequired(true)
       )
   )
@@ -55,7 +54,7 @@ const data = new SlashCommandBuilder()
       .addStringOption((option) =>
         option
           .setName("word")
-          .setDescription("The word to unban")
+          .setDescription("The word to delete")
           .setRequired(true)
       )
   )
@@ -74,32 +73,35 @@ const data = new SlashCommandBuilder()
 function toRankingList(list: Ranking[]): APIEmbedField[] {
   return list.map(({ id, word, count }, index) => {
     return {
-      name: `#${index + 1}. Banned word count: ${count}`,
+      name: `#${index + 1}. Typed count: ${count}`,
       value: id ? userMention(id) : word ? word : "",
     };
   });
 }
 
 const executor: {
-  [key in Subcommand]: (interaction: InteractionType) => BaseMessageOptions;
+  [key in Subcommand]: (
+    interaction: InteractionType,
+    wordList: BannedWordList
+  ) => BaseMessageOptions;
 } = {
-  [Subcommand.Add]: (interaction) => {
-    const word = interaction.options.getString("word")?.trim();
-    const reply = database.add(word!)
-      ? `Added the word ${word} from the banned list.`
+  [Subcommand.Add]: (interaction, wordList) => {
+    const word = interaction.options.getString("word")?.trim().toLowerCase();
+    const reply = wordList.add(word!)
+      ? `Added the word ${word} to the tracking list.`
       : `Failed to add the word`;
 
     return updater.message({
       description: reply,
     });
   },
-  [Subcommand.List]: function (interaction) {
-    const result = database.wordList();
+  [Subcommand.List]: function (interaction, wordList) {
+    const result = wordList.wordList();
 
     return updater.message(
       result.length > 0
         ? {
-            description: "Banned word list",
+            description: "Tracking word list",
             field: toRankingList(result),
           }
         : {
@@ -108,21 +110,21 @@ const executor: {
           }
     );
   },
-  [Subcommand.Remove]: (interaction) => {
-    const word = interaction.options.getString("word")?.trim();
-    const reply = database.remove(word!)
-      ? `Removed the word ${word} from the banned list.`
+  [Subcommand.Remove]: (interaction, wordList) => {
+    const word = interaction.options.getString("word")?.trim().toLowerCase();
+    const reply = wordList.remove(word!)
+      ? `Removed the word ${word} from the tracking list.`
       : `Failed to remove the word`;
 
     return updater.message({
       description: reply,
     });
   },
-  [Subcommand.Ranking]: function (interaction): BaseMessageOptions {
-    const word = interaction.options.getString("word")?.trim();
+  [Subcommand.Ranking]: function (interaction, wordList): BaseMessageOptions {
+    const word = interaction.options.getString("word")?.trim().toLowerCase();
     const user = interaction.options.getUser("user");
 
-    const result = database.ranking(word, user?.id);
+    const result = wordList.ranking(word, user?.id);
     return updater.message(
       result.length > 0
         ? {
@@ -144,8 +146,14 @@ const executor: {
 async function execute(interaction: InteractionType) {
   await interaction.deferReply();
 
-  const subcommand = interaction.options.getSubcommand() as Subcommand;
-  const message: BaseMessageOptions = await executor[subcommand](interaction);
+  const wordList = database.getGuildData(interaction.guildId!)?.bannedWord;
+  let message = updater.message({
+    description: "Your guild is not supported this function.",
+  });
+  if (wordList) {
+    const subcommand = interaction.options.getSubcommand() as Subcommand;
+    message = await executor[subcommand](interaction, wordList);
+  }
 
   await interaction.editReply(message);
 }

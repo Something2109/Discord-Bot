@@ -11,13 +11,18 @@ type Ranking = {
   count: number;
 };
 
+/**
+ * Contains the saved words and the number count of each user to each word.
+ */
 class WordList extends JsonLoader {
+  SaveName = "banned-word.json";
   list: WordRankingList[];
-  path = "./database/banned-word.json";
+  path: string;
 
-  constructor() {
+  constructor(path: string) {
     super();
     this.list = [];
+    this.path = path;
     this.load();
   }
 
@@ -37,6 +42,8 @@ class WordList extends JsonLoader {
 
   /**
    * Set a banned word to database.
+   * @param word The word to set.
+   * @returns The word if success else undefined.
    */
   add(word: string) {
     const wordRanking = this.list.find((value) => value.word == word);
@@ -46,11 +53,16 @@ class WordList extends JsonLoader {
         list: [],
       };
       this.list.push(newWord);
+      this.save();
       return word;
     }
     return undefined;
   }
 
+  /**
+   * Get the word list currently stored.
+   * @returns The ranking object containing the words and total count of each.
+   */
   wordList() {
     return this.wordRanking();
   }
@@ -58,11 +70,13 @@ class WordList extends JsonLoader {
   /**
    * Remove a word from the list.
    * @param word The word to remove.
+   * @returns The word if success else undefined.
    */
   remove(word: string) {
     const wordRanking = this.list.find((value) => value.word == word);
     if (wordRanking) {
       this.list.splice(this.list.indexOf(wordRanking), 1);
+      this.save();
       return word;
     }
     return undefined;
@@ -85,6 +99,7 @@ class WordList extends JsonLoader {
           count: 1,
         });
       }
+      this.save();
     }
   }
 

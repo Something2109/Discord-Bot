@@ -1,6 +1,7 @@
 import { ChildProcess, spawn } from "child_process";
 import { Updater } from "../Updater";
 import path from "node:path";
+import fs from "fs";
 
 /**
  * Server interface to use in other classes or functions.
@@ -24,6 +25,7 @@ interface Server {
    * The list of the players.
    */
   get list(): Array<PlayerInfo>;
+
   /**
    * Stop the minecraftv server.
    * @returns The server status showing the state of the server.
@@ -49,7 +51,7 @@ interface PlayerInfo {
  * Minecraft server class used to control the minecraft server.
  */
 class DefaultServer implements Server {
-  private readonly directory: string | undefined;
+  private readonly directory: string;
   private readonly arguments: Array<string>;
   private readonly timeoutMin: number;
 
@@ -59,8 +61,13 @@ class DefaultServer implements Server {
   private stopTimeout?: NodeJS.Timeout;
   private updater: Updater;
 
-  constructor(updater: Updater) {
-    [this.directory, ...this.arguments] = this.pathResolver();
+  constructor(updater: Updater, directory?: string, fileName?: string) {
+    [this.directory, fileName] = this.pathResolver(directory, fileName);
+    this.arguments = this.argumentResolver();
+    this.arguments.push("-jar", fileName);
+    console.log(
+      `[MCS]: Server configures with directory: ${this.directory}, arguments: ${this.arguments}`
+    );
     this.timeoutMin = process.env.MC_TIMEOUT
       ? parseFloat(process.env.MC_TIMEOUT)
       : 6;
@@ -96,9 +103,6 @@ class DefaultServer implements Server {
     return status;
   }
 
-  /**
-   * The list of the players.
-   */
   public get list() {
     return this.players;
   }
@@ -125,30 +129,54 @@ class DefaultServer implements Server {
   }
 
   /**
-   * Read the server directory and the start arguments from the specified env variables.
-   * @returns the array contains the directory string and the arguments to start the server.
+   * Check the validity of the directory if given else the specified env variables.
+   * @param directory The directory to check.
+   * @param filename The filename of the jar file.
+   * @returns The array contains the directory and server jar file to start the server.
    */
-  private pathResolver() {
-    if (!process.env.MC_DIR) {
-      throw new Error("You need to add the server directory to env file");
+  private pathResolver(
+    directory = process.env.MC_DIR,
+    filename?: string
+  ): string[] {
+    if (!directory) {
+      throw new Error("Undefined directory.");
     }
-    const fileName = path.basename(process.env.MC_DIR);
-    if (!fileName || !fileName.endsWith(".jar")) {
-      throw new Error("The file in the directory is not a jar file");
+    if (directory.endsWith(".jar")) {
+      directory = path.dirname(directory);
     }
+
+    if (!filename) {
+      filename = directory.endsWith(".jar")
+        ? path.basename(directory)
+        : "server.jar";
+    } else if (!filename.endsWith(".jar")) {
+      throw new Error(`Invalid server jar file ${filename}.`);
+    }
+
+    if (!fs.existsSync(path.join(directory, filename))) {
+      throw new Error(`Cannot find server jar file from ${directory}.`);
+    }
+    return [directory, filename];
+  }
+
+  /**
+   * Add the argument to start server if valid else use the default value.
+   * @param initMem The initial memory given to the server when start.
+   * @param maxMem The maximum memory the server will take if needed.
+   * @param gui_enable Enable the GUI of the server.
+   * @returns The argument array to start the server.
+   */
+  private argumentResolver(
+    initMem = process.env.MC_INIT_MEMORY,
+    maxMem = process.env.MC_MAX_MEMORY,
+    gui_enable = process.env.MC_GUI
+  ): string[] {
     const result = new Array();
     result.push(
-      path.dirname(process.env.MC_DIR),
-      process.env.MC_INIT_MEMORY && process.env.MC_INIT_MEMORY.match(/^[0-9]*$/)
-        ? `-Xms${process.env.MC_INIT_MEMORY}M`
-        : "-Xms2048M",
-      process.env.MC_MAX_MEMORY && process.env.MC_MAX_MEMORY.match(/^[0-9]*$/)
-        ? `-Xmx${process.env.MC_MAX_MEMORY}M`
-        : "-Xmx4096M",
-      "-jar",
-      fileName
+      initMem && initMem.match(/^[0-9]*$/) ? `-Xms${initMem}M` : "-Xms2048M",
+      maxMem && maxMem.match(/^[0-9]*$/) ? `-Xmx${maxMem}M` : "-Xmx4096M"
     );
-    if (!(process.env.MC_GUI === "true")) {
+    if (!(gui_enable === "true")) {
       result.push("-nogui");
     }
     return result;

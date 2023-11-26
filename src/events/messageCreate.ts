@@ -5,7 +5,7 @@ module.exports = {
   name: Events.MessageCreate,
   async execute(message: Message) {
     const wordList = message.guild?.id
-      ? Database.getGuildData(message.guild?.id)?.bannedWord
+      ? Database.get(message.guild?.id)?.bannedWord
       : undefined;
 
     if (wordList && message.author.id !== process.env.CLIENT_ID) {

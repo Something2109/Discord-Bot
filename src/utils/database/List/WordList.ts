@@ -15,9 +15,9 @@ type Ranking = {
  * Contains the saved words and the number count of each user to each word.
  */
 class WordList extends JsonLoader {
-  SaveName = "banned-word.json";
-  list: WordRankingList[];
-  path: string;
+  protected SaveName = "banned-word.json";
+  protected list: WordRankingList[];
+  protected path: string;
 
   constructor(path: string) {
     super();

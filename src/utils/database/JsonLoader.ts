@@ -6,9 +6,9 @@ import path from "node:path";
  * Contains the base data storing properties and the save and load json functions.
  */
 abstract class JsonLoader {
-  abstract list: any[];
-  abstract path: string;
-  abstract readonly SaveName: string;
+  protected abstract list: any[];
+  protected abstract path: string;
+  protected abstract readonly SaveName: string;
   private saveCooldown?: NodeJS.Timeout;
 
   /**

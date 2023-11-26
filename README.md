@@ -11,7 +11,7 @@
 
 1. Install [Nodejs](https://nodejs.org/en) to create the runtime environment to run the bot.
 2. Register your own bot from the [Discord's Developer Portal](https://discord.com/developers/applications) and write down the bot's token and id. Invite it to your server and mark down the server's guild id.
-3. To run the minecraft server, you must install [Java](https://www.java.com/en/) and download the [Minecraft Server](https://www.minecraft.net/en-us/download/server) jar file to your computer/server. Then set up and make sure to enable rcon in the server (you can read the tutorial of how to set up the server [here](https://minecraft.fandom.com/wiki/Tutorials/Setting_up_a_server) and what to enable rcon [here](https://minecraft.fandom.com/wiki/Server.properties)).
+3. To run the minecraft server, you must install [Java](https://www.java.com/en/) and download the [Minecraft Server](https://www.minecraft.net/en-us/download/server) jar file to your computer/server.
 4. This is the no [Ngrok](https://ngrok.com/) version of the bot, so no Ngrok installation required.
 
 ### Install

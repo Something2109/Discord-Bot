@@ -56,7 +56,7 @@ interface PlayerInfo {
  * Minecraft server class used to control the minecraft server.
  */
 class DefaultServer implements Server {
-  private readonly directory: string;
+  protected readonly directory: string;
   private readonly arguments: Array<string>;
   private readonly address: string;
   private readonly timeoutMin: number;
@@ -81,6 +81,7 @@ class DefaultServer implements Server {
     this.timeoutMin = process.env.MC_TIMEOUT
       ? parseFloat(process.env.MC_TIMEOUT)
       : 6;
+    this.eulaResolver();
 
     this.process = undefined;
     this.starting = false;
@@ -194,6 +195,20 @@ class DefaultServer implements Server {
       result.push("-nogui");
     }
     return result;
+  }
+
+  /**
+   * Create or change the Eula file so the server can run.
+   */
+  private eulaResolver(): void {
+    const eulaPath = path.join(this.directory, "eula.txt");
+    if (fs.existsSync(eulaPath)) {
+      const data = fs.readFileSync(eulaPath).toString();
+      if (data.includes("eula=true")) {
+        return;
+      }
+    }
+    fs.writeFileSync(eulaPath, "eula=true");
   }
 
   /**

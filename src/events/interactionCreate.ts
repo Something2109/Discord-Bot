@@ -4,24 +4,22 @@ import { CustomClient } from "../utils/Client";
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction: BaseInteraction) {
-    if (interaction.guild?.id === process.env.GUILD_ID) {
-      let commandName = undefined;
+    let commandName = undefined;
 
-      if (interaction.isChatInputCommand()) {
-        commandName = interaction.commandName;
-      } else if (interaction.isButton()) {
-        [commandName] = interaction.customId.split(" ");
-      }
+    if (interaction.isChatInputCommand()) {
+      commandName = interaction.commandName;
+    } else if (interaction.isButton()) {
+      [commandName] = interaction.customId.split(" ");
+    }
 
-      const client = interaction.client as CustomClient;
-      let command = client.getCommand(commandName);
+    const client = interaction.client as CustomClient;
+    let command = client.getCommand(commandName);
 
-      try {
-        await command?.execute(interaction);
-      } catch (error) {
-        console.error(`Error executing ${commandName}`);
-        console.error(error);
-      }
+    try {
+      await command?.execute(interaction);
+    } catch (error) {
+      console.error(`[BOT]: Error executing ${commandName}`);
+      console.error(error);
     }
   },
 };

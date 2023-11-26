@@ -41,7 +41,7 @@ abstract class JsonLoader {
         .readFileSync(path.join(this.path, this.SaveName))
         .toString();
       this.list = JSON.parse(data);
-      console.log(`[DTB]: Read ${this.SaveName} from ${this.path}}`);
+      console.log(`[DTB]: Read ${this.SaveName} from ${this.path}`);
     }
   }
 }

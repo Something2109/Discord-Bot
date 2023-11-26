@@ -12,7 +12,6 @@ import { BannedWordList, Ranking } from "../utils/database/List/WordList";
 type InteractionType = ChatInputCommandInteraction;
 
 const updater: Updater = new DefaultUpdater("Word ranking");
-const database = new Database();
 
 enum Subcommand {
   Add = "add",
@@ -146,7 +145,7 @@ const executor: {
 async function execute(interaction: InteractionType) {
   await interaction.deferReply();
 
-  const wordList = database.getGuildData(interaction.guildId!)?.bannedWord;
+  const wordList = Database.getGuildData(interaction.guildId!)?.bannedWord;
   let message = updater.message({
     description: "Your guild is not supported this function.",
   });

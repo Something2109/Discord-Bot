@@ -41,7 +41,7 @@ class Database {
    * @param guildId The id to add.
    * @returns The id if success else undefined.
    */
-  static addGuild(guildId: string) {
+  static add(guildId: string) {
     const guildList = this.getInstance();
     if (guildList[guildId] == undefined) {
       fs.mkdirSync(path.join(Database.path, guildId));
@@ -62,7 +62,7 @@ class Database {
    * @param guildId The id to get data.
    * @returns The data of the guild if database contains else undefined.
    */
-  static getGuildData(guildId: string) {
+  static get(guildId: string) {
     const guildList = this.getInstance();
     if (guildList[guildId] !== undefined) {
       return guildList[guildId];
@@ -75,7 +75,7 @@ class Database {
    * @param guildId The id to remove.
    * @returns The id if success else undefined.
    */
-  static removeGuild(guildId: string) {
+  static remove(guildId: string) {
     const guildList = this.getInstance();
     if (guildList[guildId] !== undefined) {
       fs.rmSync(path.join(Database.path, guildId));

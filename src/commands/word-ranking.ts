@@ -145,7 +145,7 @@ const executor: {
 async function execute(interaction: InteractionType) {
   await interaction.deferReply();
 
-  const wordList = Database.getGuildData(interaction.guildId!)?.bannedWord;
+  const wordList = Database.get(interaction.guildId!)?.bannedWord;
   let message = updater.message({
     description: "Your guild is not supported this function.",
   });

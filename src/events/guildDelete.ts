@@ -4,7 +4,7 @@ import { Database } from "../utils/database/Database";
 module.exports = {
   name: Events.GuildCreate,
   async execute(guild: Guild) {
-    if (Database.addGuild(guild.id)) {
+    if (Database.add(guild.id)) {
       console.log(
         `[BOT]: Successfully removed ${guild.name} from the database.`
       );

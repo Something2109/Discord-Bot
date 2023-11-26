@@ -1,23 +1,17 @@
 import {
   SlashCommandSubcommandBuilder,
   SlashCommandBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  Message,
   ChatInputCommandInteraction,
-  ButtonInteraction,
   BaseMessageOptions,
   APIEmbedField,
-  ActionRowBuilder,
   TextBasedChannel,
 } from "discord.js";
 import { DefaultServer, Server, ServerStatus } from "../utils/mc-server/Server";
 import { DefaultNgrok, Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
 import { Updater, DefaultUpdater, MessageAPI } from "../utils/Updater";
 
-type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
+type InteractionType = ChatInputCommandInteraction;
 
-let previousMsg: Message | undefined = undefined;
 const updater: Updater = new DefaultUpdater("Minecraft Server");
 const server: Server = new DefaultServer(updater);
 const ngrok: Ngrok = new DefaultNgrok();
@@ -83,46 +77,10 @@ const data = new SlashCommandBuilder()
       .setDescription(description[Subcommand.List])
   );
 
-const buttons = {
-  [Subcommand.Start]: new ButtonBuilder()
-    .setCustomId(`${data.name} ${Subcommand.Start}`)
-    .setLabel("Start")
-    .setStyle(ButtonStyle.Success),
-  [Subcommand.Stop]: new ButtonBuilder()
-    .setCustomId(`${data.name} ${Subcommand.Stop}`)
-    .setLabel("Stop")
-    .setStyle(ButtonStyle.Danger),
-  [Subcommand.Status]: new ButtonBuilder()
-    .setCustomId(`${data.name} ${Subcommand.Status}`)
-    .setLabel("Status")
-    .setStyle(ButtonStyle.Secondary),
-  [Subcommand.List]: new ButtonBuilder()
-    .setCustomId(`${data.name} ${Subcommand.List}`)
-    .setLabel("List")
-    .setStyle(ButtonStyle.Secondary),
-};
-
-/**
- * Get the subcommand to progress to the server.
- * @param interaction
- * @returns The needed subcommand.
- */
-function getSubcommand(interaction: InteractionType): Subcommand {
-  let subcommand: string = Subcommand.Status;
-  if (interaction.isChatInputCommand()) {
-    subcommand = interaction.options.getSubcommand();
-  } else if (interaction.isButton()) {
-    [, subcommand] = interaction.customId.split(" ");
-  }
-  console.log(`[CMD]: Executing command mc-server ${subcommand}`);
-  return subcommand as Subcommand;
-}
-
 /**
  * Get the reply to a specific command.
  * @param subcommand The subcommand of the interaction.
  * @param status Current status of the server.
- * @param tunnel The Ngrok tunnel.
  * @returns The reply string.
  */
 function getReply(
@@ -150,30 +108,7 @@ function getReply(
   return updater.message({
     description: `Command ${subcommand}:`,
     field: [serverReply, ngrokReply],
-    actionRow: getButton(status),
   });
-}
-
-/**
- * Create the button row based on the status of the server.
- * @param status Current status of the server.
- * @returns The action row contains the buttons.
- */
-function getButton(status: ServerStatus): ActionRowBuilder | undefined {
-  if (status == ServerStatus.Online) {
-    return new ActionRowBuilder().addComponents(
-      buttons[Subcommand.Status],
-      buttons[Subcommand.List],
-      buttons[Subcommand.Stop]
-    );
-  } else if (status == ServerStatus.Offline) {
-    return new ActionRowBuilder().addComponents(
-      buttons[Subcommand.Start],
-      buttons[Subcommand.Status]
-    );
-  } else {
-    return undefined;
-  }
 }
 
 const executor: {
@@ -197,11 +132,10 @@ const executor: {
     ]);
     return getReply(subcommand, status, tunnel);
   },
-  [Subcommand.List]: async (subcommand): Promise<BaseMessageOptions> => {
+  [Subcommand.List]: async (subcommand) => {
     const status = await server.status();
     let message: MessageAPI = {
       description: reply[subcommand][status],
-      actionRow: getButton(status),
     };
     if (server.list.length > 0) {
       message.field = server.list.map((player) => {
@@ -216,18 +150,14 @@ const executor: {
 };
 
 async function execute(interaction: InteractionType) {
-  await previousMsg?.edit({
-    components: [],
-  });
-
   await interaction.deferReply();
 
   updater.channel = interaction.channel as TextBasedChannel;
 
-  const subcommand = getSubcommand(interaction);
+  const subcommand = interaction.options.getSubcommand() as Subcommand;
   const message = await executor[subcommand](subcommand);
 
-  previousMsg = await interaction.editReply(message);
+  await interaction.editReply(message);
 }
 
 export { data, execute };

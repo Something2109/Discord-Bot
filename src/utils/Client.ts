@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
+import { Database } from "./database/Database";
 const rootPath = path.dirname(path.dirname(__filename));
 
 interface CommandObject {
@@ -17,9 +18,14 @@ interface CommandObject {
 
 class CustomClient extends Client {
   private commands: Collection<string, CommandObject>;
+  private readonly clientId: string;
 
   constructor(options: ClientOptions) {
     super(options);
+    if (!process.env.CLIENT_ID) {
+      throw new Error("You must put the client ID to the env file.");
+    }
+    this.clientId = process.env.CLIENT_ID;
     this.commands = new Collection<string, CommandObject>();
   }
 
@@ -48,21 +54,21 @@ class CustomClient extends Client {
       const commands = this.commands.map((command) => command.data.toJSON());
 
       console.log(
-        `Started refreshing ${commands.length} application (/) commands.`
+        `[BOT]: Started refreshing ${commands.length} application (/) commands.`
       );
 
-      // The put method is used to fully refresh all commands in the guild with the current set
-      const data: Array<Object> = (await rest.put(
-        Routes.applicationGuildCommands(
-          process.env.CLIENT_ID!,
-          process.env.GUILD_ID!
-        ),
-        { body: commands }
-      )) as Array<Object>;
-
-      console.log(
-        `Successfully reloaded ${data.length} application (/) commands.`
-      );
+      Database.guildList.forEach((guildId) => {
+        // The put method is used to fully refresh all commands in the guild with the current set
+        rest
+          .put(Routes.applicationGuildCommands(this.clientId, guildId), {
+            body: commands,
+          })
+          .then(() => {
+            console.log(
+              `[BOT]: Successfully reloaded application (/) commands to server ${guildId}.`
+            );
+          });
+      });
     } catch (error) {
       // And of course, make sure you catch and log any errors!
       console.error(error);

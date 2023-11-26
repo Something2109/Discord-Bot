@@ -8,14 +8,19 @@ import path from "node:path";
  * Access the guild data contained by using the guild id as the key to access the data.
  */
 class Database {
-  private static guildList: {
+  private static list: {
     [guild_id: string]: GuildData;
   };
   private static readonly path = path.join(".", "database");
 
-  constructor() {
-    if (!(Database.guildList instanceof Object)) {
-      Database.guildList = {};
+  /**
+   * Create
+   * @param guildId
+   * @returns
+   */
+  private static getInstance() {
+    if (!(Database.list instanceof Object)) {
+      Database.list = {};
       if (fs.existsSync(Database.path)) {
         const guildList = fs
           .readdirSync(Database.path)
@@ -24,10 +29,11 @@ class Database {
           );
 
         guildList.forEach((guildId) => {
-          Database.guildList[guildId] = new GuildData(guildId, Database.path);
+          Database.list[guildId] = new GuildData(guildId, Database.path);
         });
       }
     }
+    return this.list;
   }
 
   /**
@@ -35,14 +41,20 @@ class Database {
    * @param guildId The id to add.
    * @returns The id if success else undefined.
    */
-  addGuild(guildId: string) {
-    if (Database.guildList[guildId] == undefined) {
+  static addGuild(guildId: string) {
+    const guildList = this.getInstance();
+    if (guildList[guildId] == undefined) {
       fs.mkdirSync(path.join(Database.path, guildId));
-      Database.guildList[guildId] = new GuildData(guildId, Database.path);
+      guildList[guildId] = new GuildData(guildId, Database.path);
 
       return guildId;
     }
     return undefined;
+  }
+
+  static get guildList() {
+    const guildList = this.getInstance();
+    return Object.keys(guildList);
   }
 
   /**
@@ -50,9 +62,10 @@ class Database {
    * @param guildId The id to get data.
    * @returns The data of the guild if database contains else undefined.
    */
-  getGuildData(guildId: string) {
-    if (Database.guildList[guildId] !== undefined) {
-      return Database.guildList[guildId];
+  static getGuildData(guildId: string) {
+    const guildList = this.getInstance();
+    if (guildList[guildId] !== undefined) {
+      return guildList[guildId];
     }
     return undefined;
   }
@@ -62,10 +75,11 @@ class Database {
    * @param guildId The id to remove.
    * @returns The id if success else undefined.
    */
-  removeGuild(guildId: string) {
-    if (Database.guildList[guildId] !== undefined) {
+  static removeGuild(guildId: string) {
+    const guildList = this.getInstance();
+    if (guildList[guildId] !== undefined) {
       fs.rmSync(path.join(Database.path, guildId));
-      delete Database.guildList[guildId];
+      delete guildList[guildId];
 
       return guildId;
     }

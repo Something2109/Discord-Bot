@@ -1,13 +1,11 @@
 import { Events, Message } from "discord.js";
 import { Database } from "../utils/database/Database";
 
-const database = new Database();
-
 module.exports = {
   name: Events.MessageCreate,
   async execute(message: Message) {
     const wordList = message.guild?.id
-      ? database.getGuildData(message.guild?.id)?.bannedWord
+      ? Database.getGuildData(message.guild?.id)?.bannedWord
       : undefined;
 
     if (wordList && message.author.id !== process.env.CLIENT_ID) {

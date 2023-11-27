@@ -26,7 +26,7 @@ abstract class JsonLoader {
         path.join(this.path, this.SaveName),
         JSON.stringify(this.list)
       );
-      console.log(`[DTB]: Save ${this.SaveName} to ${this.path}}`);
+      console.log(`[DTB]: Save ${this.SaveName} to ${this.path}`);
 
       this.saveCooldown = undefined;
     }, 10000);

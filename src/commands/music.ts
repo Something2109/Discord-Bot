@@ -16,6 +16,7 @@ const updater: Updater = new DefaultUpdater("Music Player");
 const player: Player = new DefaultPlayer(updater);
 const connection: Connection = new DefaultConnection();
 
+const commandName = "music";
 enum Subcommand {
   Add = "add",
   Remove = "remove",
@@ -44,76 +45,77 @@ const description: { [key in Subcommand]: string } = {
   [Subcommand.Unloop]: "Continue to play the next song in the queue",
 };
 
-const data = new SlashCommandBuilder()
-  .setName("music")
-  .setDescription("Play music")
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Add)
-      .setDescription(description[Subcommand.Add])
-      .addStringOption((option) =>
-        option
-          .setName("url")
-          .setDescription("The Youtube url or the keywords")
-          .setRequired(true)
-      )
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Remove)
-      .setDescription(description[Subcommand.Remove])
-      .addNumberOption((option) =>
-        option
-          .setName("number")
-          .setDescription("The place of the song in the queue")
-          .setRequired(true)
-      )
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Leave)
-      .setDescription(description[Subcommand.Leave])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Skip)
-      .setDescription(description[Subcommand.Skip])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Stop)
-      .setDescription(description[Subcommand.Stop])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.List)
-      .setDescription(description[Subcommand.List])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.ClearQueue)
-      .setDescription(description[Subcommand.ClearQueue])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Pause)
-      .setDescription(description[Subcommand.Pause])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Unpause)
-      .setDescription(description[Subcommand.Unpause])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Loop)
-      .setDescription(description[Subcommand.Loop])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Unloop)
-      .setDescription(description[Subcommand.Unloop])
-  );
+const data = (guildId: string) =>
+  new SlashCommandBuilder()
+    .setName(commandName)
+    .setDescription("Play music")
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Add)
+        .setDescription(description[Subcommand.Add])
+        .addStringOption((option) =>
+          option
+            .setName("url")
+            .setDescription("The Youtube url or the keywords")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Remove)
+        .setDescription(description[Subcommand.Remove])
+        .addNumberOption((option) =>
+          option
+            .setName("number")
+            .setDescription("The place of the song in the queue")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Leave)
+        .setDescription(description[Subcommand.Leave])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Skip)
+        .setDescription(description[Subcommand.Skip])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Stop)
+        .setDescription(description[Subcommand.Stop])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.List)
+        .setDescription(description[Subcommand.List])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.ClearQueue)
+        .setDescription(description[Subcommand.ClearQueue])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Pause)
+        .setDescription(description[Subcommand.Pause])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Unpause)
+        .setDescription(description[Subcommand.Unpause])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Loop)
+        .setDescription(description[Subcommand.Loop])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Unloop)
+        .setDescription(description[Subcommand.Unloop])
+    );
 
 function getReplyFromInfo(
   audio: AudioInfo | undefined,
@@ -259,4 +261,4 @@ async function execute(interaction: InteractionType) {
   await interaction.editReply(message);
 }
 
-export { data, execute };
+export { commandName as name, data, execute };

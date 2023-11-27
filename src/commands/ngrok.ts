@@ -11,6 +11,7 @@ type InteractionType = ChatInputCommandInteraction;
 const updater: Updater = new DefaultUpdater("Ngrok");
 const ngrok: Ngrok = new DefaultNgrok();
 
+const commandName = "ngrok";
 enum Subcommand {
   Start = "start",
   Status = "status",
@@ -23,30 +24,31 @@ const description: { [key in Subcommand]: string } = {
   [Subcommand.Stop]: "Stop the tunnel.",
 };
 
-const data = new SlashCommandBuilder()
-  .setName("ngrok")
-  .setDescription("Ngrok tunnel controller")
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Start)
-      .setDescription(description[Subcommand.Start])
-      .addStringOption((option) =>
-        option
-          .setName("addr")
-          .setDescription("The address of the port")
-          .setRequired(true)
-      )
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Stop)
-      .setDescription(description[Subcommand.Stop])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Status)
-      .setDescription(description[Subcommand.Status])
-  );
+const data = (guildId: string) =>
+  new SlashCommandBuilder()
+    .setName(commandName)
+    .setDescription("Ngrok tunnel controller")
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Start)
+        .setDescription(description[Subcommand.Start])
+        .addStringOption((option) =>
+          option
+            .setName("addr")
+            .setDescription("The address of the port")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Stop)
+        .setDescription(description[Subcommand.Stop])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Status)
+        .setDescription(description[Subcommand.Status])
+    );
 
 function getReply(
   tunnel: NgrokTunnel | undefined,
@@ -108,4 +110,4 @@ async function execute(interaction: InteractionType) {
   await interaction.editReply(reply);
 }
 
-export { data, execute };
+export { commandName as name, data, execute };

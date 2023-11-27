@@ -12,7 +12,8 @@ import { Database } from "./database/Database";
 const rootPath = path.dirname(path.dirname(__filename));
 
 interface CommandObject {
-  data: SlashCommandBuilder;
+  name: string;
+  data(guildId: string): SlashCommandBuilder;
   execute(interaction: any): Promise<void>;
 }
 
@@ -40,32 +41,34 @@ class CustomClient extends Client {
       const command = require(filePath);
 
       // Set a new item in the Collection with the key as the command name and the value as the exported module
-      "data" in command && "execute" in command
-        ? this.commands.set(command.data.name, command)
+      "name" in command && "data" in command && "execute" in command
+        ? this.commands.set(command.name, command)
         : console.log(
             `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
           );
     }
   }
 
-  async refreshCommands() {
+  public refreshCommands() {
     try {
       const rest = new REST().setToken(process.env.TOKEN!);
-      const commands = this.commands.map((command) => command.data.toJSON());
 
-      console.log(
-        `[BOT]: Started refreshing ${commands.length} application (/) commands.`
-      );
+      console.log(`[BOT]: Started refreshing application (/) commands.`);
 
       Database.guildList.forEach((guildId) => {
+        const guildCommands = this.commands.map((command) =>
+          command.data(guildId).toJSON()
+        );
+
         // The put method is used to fully refresh all commands in the guild with the current set
         rest
           .put(Routes.applicationGuildCommands(this.clientId, guildId), {
-            body: commands,
+            body: guildCommands,
           })
-          .then(() => {
+          .then((data) => {
+            const refreshed = data as Object[];
             console.log(
-              `[BOT]: Successfully reloaded application (/) commands to server ${guildId}.`
+              `[BOT]: Successfully reloaded ${refreshed.length} application (/) commands to server ${guildId}.`
             );
           });
       });

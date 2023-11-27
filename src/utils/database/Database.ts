@@ -14,9 +14,9 @@ class Database {
   private static readonly path = path.join(".", "database");
 
   /**
-   * Create
-   * @param guildId
-   * @returns
+   * Get the info stored in the database of the system.
+   * If not installed then load it from the saved file.
+   * @returns An instance of the database.
    */
   private static getInstance() {
     if (!(Database.list instanceof Object)) {

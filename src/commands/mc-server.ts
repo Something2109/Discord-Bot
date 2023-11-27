@@ -14,6 +14,7 @@ type InteractionType = ChatInputCommandInteraction;
 const updater: Updater = new DefaultUpdater("Minecraft Server");
 const server: Server = new DefaultServer(updater);
 
+const commandName = "mc-server";
 enum Subcommand {
   Start = "start",
   Stop = "stop",
@@ -51,29 +52,33 @@ const reply: { [key in Subcommand]: { [key in ServerStatus]: string } } = {
   },
 };
 
-const data = new SlashCommandBuilder()
-  .setName("mc-server")
-  .setDescription("Minecraft server command")
-  .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
+function data(guildId: string) {
+  const command = new SlashCommandBuilder()
+    .setName(commandName)
+    .setDescription("Minecraft server command");
+  command.addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
     subcommand
       .setName(Subcommand.Start)
       .setDescription(description[Subcommand.Start])
-  )
-  .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
+  );
+  command.addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
     subcommand
       .setName(Subcommand.Stop)
       .setDescription(description[Subcommand.Stop])
-  )
-  .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
+  );
+  command.addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
     subcommand
       .setName(Subcommand.Status)
       .setDescription(description[Subcommand.Status])
-  )
-  .addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
+  );
+  command.addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
     subcommand
       .setName(Subcommand.List)
       .setDescription(description[Subcommand.List])
   );
+
+  return command;
+}
 
 /**
  * Get the reply to a specific command.
@@ -140,4 +145,4 @@ async function execute(interaction: InteractionType) {
   await interaction.editReply(message);
 }
 
-export { data, execute };
+export { commandName as name, data, execute };

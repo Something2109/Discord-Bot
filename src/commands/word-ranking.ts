@@ -13,6 +13,7 @@ type InteractionType = ChatInputCommandInteraction;
 
 const updater: Updater = new DefaultUpdater("Word ranking");
 
+const commandName = "word-ranking";
 enum Subcommand {
   Add = "add",
   List = "list",
@@ -27,47 +28,48 @@ const description: { [key in Subcommand]: string } = {
   [Subcommand.List]: "Show the banned word list",
 };
 
-const data = new SlashCommandBuilder()
-  .setName("word-ranking")
-  .setDescription("Tracking and ranking words")
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Add)
-      .setDescription(description[Subcommand.Add])
-      .addStringOption((option) =>
-        option
-          .setName("word")
-          .setDescription("The word to track")
-          .setRequired(true)
-      )
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.List)
-      .setDescription(description[Subcommand.List])
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Remove)
-      .setDescription(description[Subcommand.Remove])
-      .addStringOption((option) =>
-        option
-          .setName("word")
-          .setDescription("The word to delete")
-          .setRequired(true)
-      )
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName(Subcommand.Ranking)
-      .setDescription(description[Subcommand.Ranking])
-      .addUserOption((option) =>
-        option.setName("user").setDescription("The user to search")
-      )
-      .addStringOption((option) =>
-        option.setName("word").setDescription("The word to search")
-      )
-  );
+const data = (guildId: string) =>
+  new SlashCommandBuilder()
+    .setName(commandName)
+    .setDescription("Tracking and ranking words")
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Add)
+        .setDescription(description[Subcommand.Add])
+        .addStringOption((option) =>
+          option
+            .setName("word")
+            .setDescription("The word to track")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.List)
+        .setDescription(description[Subcommand.List])
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Remove)
+        .setDescription(description[Subcommand.Remove])
+        .addStringOption((option) =>
+          option
+            .setName("word")
+            .setDescription("The word to delete")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName(Subcommand.Ranking)
+        .setDescription(description[Subcommand.Ranking])
+        .addUserOption((option) =>
+          option.setName("user").setDescription("The user to search")
+        )
+        .addStringOption((option) =>
+          option.setName("word").setDescription("The word to search")
+        )
+    );
 
 function toRankingList(list: Ranking[]): APIEmbedField[] {
   return list.map(({ id, word, count }, index) => {
@@ -157,4 +159,4 @@ async function execute(interaction: InteractionType) {
   await interaction.editReply(message);
 }
 
-export { data, execute };
+export { commandName as name, data, execute };

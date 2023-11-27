@@ -1,21 +1,23 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 
-const data = new SlashCommandBuilder()
-  .setName("fuck")
-  .setDescription("Fuck sth")
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName("user")
-      .setDescription("Fuck a user")
-      .addUserOption((option) =>
-        option.setName("target").setDescription("The user")
-      )
-  )
-  .addSubcommand((subcommand) =>
-    subcommand.setName("server").setDescription("Fuck the server")
-  );
+const data = (guildId: string) =>
+  new SlashCommandBuilder()
+    .setName("fuck")
+    .setDescription("Fuck sth")
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("user")
+        .setDescription("Fuck a user")
+        .addUserOption((option) =>
+          option.setName("target").setDescription("The user")
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName("server").setDescription("Fuck the server")
+    );
 
 module.exports = {
+  name: "fuck",
   data: data,
   async execute(interaction: ChatInputCommandInteraction) {
     if (interaction.options.getSubcommand() === "user") {

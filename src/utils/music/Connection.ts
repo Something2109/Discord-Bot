@@ -34,8 +34,8 @@ interface Connection {
 }
 
 class DefaultConnection implements Connection {
-  private connection: VoiceConnection | undefined;
-  private subscription: PlayerSubscription | undefined;
+  private static voiceConnection: VoiceConnection | undefined;
+  private static playerSubscription: PlayerSubscription | undefined;
 
   /**
    * Create a connection to the voice channer the user is in.
@@ -77,6 +77,22 @@ class DefaultConnection implements Connection {
     }
   }
 
+  private get connection(): VoiceConnection | undefined {
+    return DefaultConnection.voiceConnection;
+  }
+
+  private set connection(connection: VoiceConnection | undefined) {
+    DefaultConnection.voiceConnection = connection;
+  }
+
+  private get subscription(): PlayerSubscription | undefined {
+    return DefaultConnection.playerSubscription;
+  }
+
+  private set subscription(subscription: PlayerSubscription | undefined) {
+    DefaultConnection.playerSubscription = subscription;
+  }
+
   public set subcribe(player: AudioPlayer) {
     this.subscription = this.connection?.subscribe(player);
   }
@@ -100,6 +116,8 @@ class DefaultConnection implements Connection {
   }
 
   public leave() {
+    this.subscription?.player.stop();
+
     this.subscription?.unsubscribe();
     this.subscription = undefined;
 

@@ -29,15 +29,15 @@ class WordList extends JsonLoader {
   /**
    * Get the regex to extract banned word from text.
    */
-  get bannedWords(): RegExp {
+  get bannedWords(): RegExp | undefined {
     return this.list.length > 0
       ? new RegExp(
-          this.list
-            .map((value) => `(?:[".(_*-]|\b|^)${value.word}(?:[".)_*-]|\b|$)`)
-            .join("|"),
+          `(?:[".(_*-]|\\b|^)(${this.list
+            .map((x) => x.word)
+            .join("|")})(?:[".)_*-]|\\b|$)`,
           "g"
         )
-      : /$^/g;
+      : undefined;
   }
 
   /**

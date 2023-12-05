@@ -7,9 +7,16 @@ module.exports = {
     const wordList = message.guild?.id
       ? Database.get(message.guild?.id)?.bannedWord
       : undefined;
+    const bannedWords = wordList?.bannedWords;
 
-    if (wordList && message.author.id !== process.env.CLIENT_ID) {
-      const wordContained = [...message.content.matchAll(wordList.bannedWords)];
+    if (
+      wordList &&
+      bannedWords &&
+      message.author.id !== process.env.CLIENT_ID
+    ) {
+      const wordContained = [
+        ...message.content.toLowerCase().matchAll(wordList.bannedWords),
+      ];
       if (wordContained.length > 0) {
         for (const word of wordContained) {
           wordList.count(word[0], message.author.id);

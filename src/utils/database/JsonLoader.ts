@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "node:path";
+import { Logger } from "../Logger";
 
 /**
  * The base class of data storing.
@@ -9,7 +10,15 @@ abstract class JsonLoader {
   protected abstract list: any[];
   protected abstract path: string;
   protected abstract readonly SaveName: string;
+
+  protected static logger: Logger;
   private saveCooldown?: NodeJS.Timeout;
+
+  constructor() {
+    if (!JsonLoader.logger) {
+      JsonLoader.logger = new Logger("LDR");
+    }
+  }
 
   /**
    * Save the data to Json file.
@@ -26,7 +35,7 @@ abstract class JsonLoader {
         path.join(this.path, this.SaveName),
         JSON.stringify(this.list)
       );
-      console.log(`[DTB]: Save ${this.SaveName} to ${this.path}}`);
+      JsonLoader.logger.log(`Save ${this.SaveName} to ${this.path}`);
 
       this.saveCooldown = undefined;
     }, 10000);
@@ -41,7 +50,7 @@ abstract class JsonLoader {
         .readFileSync(path.join(this.path, this.SaveName))
         .toString();
       this.list = JSON.parse(data);
-      console.log(`[DTB]: Read ${this.SaveName} from ${this.path}`);
+      JsonLoader.logger.log(`Read ${this.SaveName} from ${this.path}`);
     }
   }
 }

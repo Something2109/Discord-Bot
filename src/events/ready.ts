@@ -1,9 +1,11 @@
 import { Events, Client } from "discord.js";
+import { CustomClient } from "../utils/Client";
 
 module.exports = {
   name: Events.ClientReady,
   once: true,
   execute(client: Client) {
-    console.log(`[BOT]: Ready! Logged in as ${client.user!.tag}`);
+    const customClient = client as CustomClient;
+    customClient.logger.log(`Ready! Logged in as ${client.user!.tag}`);
   },
 };

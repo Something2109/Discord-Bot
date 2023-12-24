@@ -9,6 +9,7 @@ import {
   joinVoiceChannel,
 } from "@discordjs/voice";
 import { VoiceBasedChannel } from "discord.js";
+import { Logger } from "../Logger";
 
 interface Connection {
   /**
@@ -36,6 +37,11 @@ interface Connection {
 class DefaultConnection implements Connection {
   private static voiceConnection: VoiceConnection | undefined;
   private static playerSubscription: PlayerSubscription | undefined;
+  private logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("VOI");
+  }
 
   /**
    * Create a connection to the voice channer the user is in.
@@ -57,8 +63,8 @@ class DefaultConnection implements Connection {
    * @param newState The new state of the connection.
    */
   private onStageChange(oldState: State, newState: State) {
-    console.log(
-      `[VOI]: Connection transitioned from ${oldState.status} to ${newState.status}`
+    this.logger.log(
+      `Connection transitioned from ${oldState.status} to ${newState.status}`
     );
   }
 
@@ -72,7 +78,8 @@ class DefaultConnection implements Connection {
         entersState(this.connection!, Status.Connecting, 5_000),
       ]);
     } catch (error) {
-      console.log(error);
+      const logError = error as Error;
+      this.logger.error(logError.message);
       await this.leave();
     }
   }
@@ -110,6 +117,8 @@ class DefaultConnection implements Connection {
         this.connection.destroy();
         this.joinVoice(channel);
       }
+
+      this.logger.log(`Connected to ${channel.name}`);
       return true;
     }
     return false;
@@ -123,6 +132,8 @@ class DefaultConnection implements Connection {
 
     this.connection?.destroy();
     this.connection = undefined;
+
+    this.logger.log("Left the current voice channel");
   }
 }
 

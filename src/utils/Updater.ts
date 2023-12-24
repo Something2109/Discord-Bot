@@ -4,6 +4,7 @@ import {
   Message,
   TextBasedChannel,
 } from "discord.js";
+import { Logger } from "./Logger";
 
 interface MessageAPI {
   title?: string;
@@ -45,8 +46,12 @@ interface Updater {
 class DefaultUpdater implements Updater {
   private readonly title: string;
   private textChannel: TextBasedChannel | undefined;
+  private static logger: Logger;
 
   constructor(title: string) {
+    if (!DefaultUpdater.logger) {
+      DefaultUpdater.logger = new Logger("UDR");
+    }
     this.title = title;
   }
 
@@ -72,7 +77,8 @@ class DefaultUpdater implements Updater {
     try {
       return this.textChannel?.send(this.message(message));
     } catch (error) {
-      console.log(error);
+      const logError = error as Error;
+      DefaultUpdater.logger.error(logError.message);
     }
   }
 }

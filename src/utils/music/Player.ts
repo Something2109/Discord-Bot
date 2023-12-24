@@ -7,6 +7,7 @@ import {
 } from "@discordjs/voice";
 import { Updater } from "../Updater";
 import { Youtube } from "./Youtube";
+import { Logger } from "../Logger";
 
 interface Player {
   /**
@@ -91,6 +92,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
   private playing?: AudioInfo;
   private queue: Array<AudioInfo>;
   private updater: Updater;
+  private logger: Logger;
   private audioDownloader: Youtube;
 
   constructor(updater: Updater) {
@@ -104,6 +106,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
     this.playing = undefined;
     this.queue = new Array<AudioInfo>();
     this.updater = updater;
+    this.logger = new Logger("PLR");
     this.audioDownloader = new Youtube();
   }
 
@@ -113,8 +116,8 @@ class DefaultPlayer extends AudioPlayer implements Player {
    * @param newState The new state of the player.
    */
   private onStageChange(oldState: State, newState: State) {
-    console.log(
-      `[PLR]: Player transitioned from ${oldState.status} to ${newState.status}`
+    this.logger.log(
+      `Player transitioned from ${oldState.status} to ${newState.status}`
     );
   }
 
@@ -123,7 +126,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
    * @param error the player error.
    */
   private onError(error: Error) {
-    console.error(`[PLR]: Audio Player Error: ${error.message} with resources`);
+    this.logger.error(`Audio Player Error: ${error.message} with resources`);
     this.updater.send({
       description: `Error when playing ${this.playing?.title}: ${error.message}`,
     });
@@ -145,10 +148,12 @@ class DefaultPlayer extends AudioPlayer implements Player {
    * Function executed when the player changes to playing state.
    */
   private onPlaying() {
+    const message = `Playing ${this.playing?.title}`;
     this.updater.send({
-      description: `Playing ${this.playing?.title}`,
+      description: message,
       url: this.playing?.url,
     });
+    this.logger.log(message);
   }
 
   /**
@@ -179,9 +184,11 @@ class DefaultPlayer extends AudioPlayer implements Player {
             this.play();
           }
         }
+        this.logger.log(`Added ${NewAudio.length} songs to the player queue`);
         return NewAudio;
       } catch (error) {
-        console.log(error);
+        const logError = error as Error;
+        this.logger.error(logError.message);
       }
     }
     return [];
@@ -190,6 +197,8 @@ class DefaultPlayer extends AudioPlayer implements Player {
   public remove(number: number | null): AudioInfo | undefined {
     if (number && number > 0 && number <= this.queue.length) {
       let removed = this.queue.splice(number - 1, 1);
+
+      this.logger.log(`Removed ${removed[0].title} from the player queue`);
       return removed[0];
     }
     return undefined;
@@ -198,12 +207,16 @@ class DefaultPlayer extends AudioPlayer implements Player {
   public skip(): AudioInfo | undefined {
     const oldSong = this.playing;
     super.stop(true);
+
+    this.logger.log(`Skipped ${oldSong?.title} from playing`);
     return oldSong;
   }
 
   public stop(force?: boolean) {
     this.clearqueue();
     this.playing = undefined;
+
+    this.logger.log(`Stopped the player`);
     return super.stop(true);
   }
 
@@ -214,16 +227,22 @@ class DefaultPlayer extends AudioPlayer implements Player {
   public clearqueue() {
     const oldQueue = this.queue;
     this.queue = [];
+
+    this.logger.log(`cleared the player queue`);
     return oldQueue;
   }
 
   loop(): AudioInfo | undefined {
     this.looping = true;
+
+    this.logger.log(`Started looping mode`);
     return this.playing;
   }
 
   unloop(): AudioInfo | undefined {
     this.looping = false;
+
+    this.logger.log(`Stopped looping mode`);
     return this.playing;
   }
 }

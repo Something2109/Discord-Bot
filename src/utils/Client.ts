@@ -9,6 +9,7 @@ import {
 import fs from "node:fs";
 import path from "node:path";
 import { Database } from "./database/Database";
+import { Logger } from "./Logger";
 import { Connection, DefaultConnection } from "./music/Connection";
 const rootPath = path.dirname(path.dirname(__filename));
 
@@ -21,6 +22,7 @@ interface CommandObject {
 class CustomClient extends Client {
   private commands: Collection<string, CommandObject>;
   private readonly clientId: string;
+  public readonly logger: Logger;
   public readonly connection: Connection;
 
   constructor(options: ClientOptions) {
@@ -31,6 +33,9 @@ class CustomClient extends Client {
     this.clientId = process.env.CLIENT_ID;
     this.commands = new Collection<string, CommandObject>();
     this.connection = new DefaultConnection();
+    this.logger = new Logger("BOT");
+
+    this.logger.log("Creating client");
   }
 
   public async existingGuildCheck() {
@@ -40,7 +45,7 @@ class CustomClient extends Client {
       if (!Database.guildList.includes(guildId)) {
         Database.add(guildId);
 
-        console.log(`[DTB]: Added existing guild ${guildId} to the database.`);
+        this.logger.log(`Added existing guild ${guildId} to the database`);
       }
     }
   }
@@ -58,7 +63,7 @@ class CustomClient extends Client {
       // Set a new item in the Collection with the key as the command name and the value as the exported module
       "name" in command && "data" in command && "execute" in command
         ? this.commands.set(command.name, command)
-        : console.log(
+        : this.logger.log(
             `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
           );
     }
@@ -68,7 +73,7 @@ class CustomClient extends Client {
     try {
       const rest = new REST().setToken(process.env.TOKEN!);
 
-      console.log(`[BOT]: Started refreshing application (/) commands.`);
+      this.logger.log(`Started refreshing application (/) commands`);
 
       Database.guildList.forEach((guildId) => {
         const guildCommands = this.commands.map((command) =>
@@ -82,14 +87,15 @@ class CustomClient extends Client {
           })
           .then((data) => {
             const refreshed = data as Object[];
-            console.log(
-              `[BOT]: Successfully reloaded ${refreshed.length} application (/) commands to server ${guildId}.`
+            this.logger.log(
+              `Successfully reloaded ${refreshed.length} application (/) commands to server ${guildId}`
             );
           });
       });
     } catch (error) {
       // And of course, make sure you catch and log any errors!
-      console.error(error);
+      const logError = error as Error;
+      this.logger.error(logError.message);
     }
   }
 

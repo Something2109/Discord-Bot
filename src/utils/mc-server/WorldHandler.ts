@@ -60,7 +60,7 @@ class DefaultMultiWorldServer
     if (!currentWorld) {
       this.writeLevelName();
     } else {
-      console.log(`[MCS]: Current world: ${currentWorld}.`);
+      this.logger.log(`Current world: ${currentWorld}`);
     }
   }
 
@@ -118,7 +118,7 @@ class DefaultMultiWorldServer
       .join(this.WorldDirectory, name)
       .toString()
       .replaceAll("\\", "\\\\")}`;
-    console.log(`[MCS]: Set ${propertyData}.`);
+    this.logger.log(`Set the server's world to ${name}`);
 
     if (fs.existsSync(this.PropertiesFileDirectory)) {
       const fileData = fs.readFileSync(this.PropertiesFileDirectory).toString();

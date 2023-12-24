@@ -2,6 +2,7 @@ import { ChildProcess, spawn } from "child_process";
 import { Updater } from "../Updater";
 import path from "node:path";
 import fs from "fs";
+import { Logger } from "../Logger";
 
 /**
  * Server interface to use in other classes or functions.
@@ -66,14 +67,12 @@ class DefaultServer implements Server {
   private players: Array<PlayerInfo>;
   private stopTimeout?: NodeJS.Timeout;
   private updater: Updater;
+  protected logger: Logger;
 
   constructor(updater: Updater, directory?: string, fileName?: string) {
     [this.directory, fileName] = this.pathResolver(directory, fileName);
     this.arguments = this.argumentResolver();
     this.arguments.push("-jar", fileName);
-    console.log(
-      `[MCS]: Server configures with directory: ${this.directory}, arguments: ${this.arguments}`
-    );
 
     this.address = process.env.MC_HOST
       ? process.env.MC_HOST
@@ -87,6 +86,11 @@ class DefaultServer implements Server {
     this.starting = false;
     this.players = new Array();
     this.updater = updater;
+    this.logger = new Logger("MCS");
+
+    this.logger.log(
+      `Server configures with directory: ${this.directory}, arguments: ${this.arguments}`
+    );
   }
 
   public async start(): Promise<ServerStatus> {
@@ -100,7 +104,8 @@ class DefaultServer implements Server {
         connection = ServerStatus.Starting;
       }
     } catch (error) {
-      console.log(error);
+      const logError = error as Error;
+      this.logger.error(logError.message);
       this.killServer();
     }
     return connection;
@@ -137,8 +142,8 @@ class DefaultServer implements Server {
         connection = ServerStatus.Starting;
       }
     } catch (error) {
-      console.log(error);
-      this.killServer();
+      const logError = error as Error;
+      this.logger.error(logError.message);
     }
     return connection;
   }
@@ -234,7 +239,7 @@ class DefaultServer implements Server {
     const dataStr: string = data.toString();
     const rawMessages = dataStr.split("\n").filter((value) => value.length);
     rawMessages.forEach((rawMessage) => {
-      console.log(`[MCS] ${rawMessage}`);
+      console.log(rawMessage);
       if (this.starting) {
         this.onStarting(rawMessage);
       } else if (!rawMessage.match(/<[a-zA-Z0-9_]{2,16}>/)) {
@@ -294,8 +299,9 @@ class DefaultServer implements Server {
    * Function executed when there is error from the server.
    * @param data The data error string.
    */
-  private onError(data: any) {
-    console.error(`[MCS]: Error: ${data}`);
+  private onError(error: any) {
+    const logError = error as Error;
+    this.logger.error(logError.message);
     this.updater.send({ description: "Server encounters error" });
     this.killServer();
   }

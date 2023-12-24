@@ -1,3 +1,5 @@
+import { Logger } from "../Logger";
+
 /**
  * Ngrok interface to use in other classes or functions.
  * All the functions return the tunnel object if these is a tunnel running
@@ -48,6 +50,7 @@ interface NgrokTunnel {
  * Default Ngrok class used to interact with the Ngrok service.
  */
 class DefaultNgrok implements Ngrok {
+  private static logger: Logger;
   private readonly controlUrl: string;
   private readonly mcTunnel: string;
 
@@ -56,6 +59,10 @@ class DefaultNgrok implements Ngrok {
     mcHost: string | undefined = process.env.MC_HOST,
     mcPort: string | undefined = process.env.MC_PORT
   ) {
+    if (!DefaultNgrok.logger) {
+      DefaultNgrok.logger = new Logger("NGK");
+    }
+
     this.controlUrl = controlUrl
       ? `http://${controlUrl}/api/tunnels`
       : `http://localhost:4040/api/tunnels`;
@@ -88,7 +95,8 @@ class DefaultNgrok implements Ngrok {
         }
       }
     } catch (error) {
-      console.log(error);
+      const logError = error as Error;
+      DefaultNgrok.logger.error(logError.message);
     }
     return tunnel;
   }
@@ -104,7 +112,8 @@ class DefaultNgrok implements Ngrok {
           tunnel = undefined;
         }
       } catch (error) {
-        console.log(error);
+        const logError = error as Error;
+        DefaultNgrok.logger.error(logError.message);
       }
     }
     return tunnel;
@@ -137,7 +146,8 @@ class DefaultNgrok implements Ngrok {
         return tunnel;
       }
     } catch (error) {
-      console.log(error);
+      const logError = error as Error;
+      DefaultNgrok.logger.error(logError.message);
     }
     return undefined;
   }

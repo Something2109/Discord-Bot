@@ -1,4 +1,8 @@
-import { Events, BaseInteraction } from "discord.js";
+import {
+  Events,
+  BaseInteraction,
+  ChatInputCommandInteraction,
+} from "discord.js";
 import { CustomClient } from "../utils/Client";
 
 module.exports = {
@@ -13,12 +17,13 @@ module.exports = {
     }
 
     const client = interaction.client as CustomClient;
+    client.logger.log(`Executing ${commandName}`);
     let command = client.getCommand(commandName);
 
     try {
       await command?.execute(interaction);
     } catch (error) {
-      console.error(`[BOT]: Error executing ${commandName}`);
+      client.logger.error(`Error executing ${commandName}`);
       console.error(error);
     }
   },

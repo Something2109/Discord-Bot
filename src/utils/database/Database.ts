@@ -1,6 +1,7 @@
 import { GuildData } from "./GuildData";
 import fs from "fs";
 import path from "node:path";
+import { Logger } from "../Logger";
 
 /**
  * The database class.
@@ -12,6 +13,7 @@ class Database {
     [guild_id: string]: GuildData;
   };
   private static readonly path = path.join(".", "database");
+  private static readonly logger = new Logger("DTB");
 
   /**
    * Get the info stored in the database of the system.
@@ -47,6 +49,7 @@ class Database {
       fs.mkdirSync(path.join(Database.path, guildId));
       guildList[guildId] = new GuildData(guildId, Database.path);
 
+      Database.logger.log(`Added the guild ${guildId} to the database`);
       return guildId;
     }
     return undefined;
@@ -81,6 +84,7 @@ class Database {
       fs.rmSync(path.join(Database.path, guildId));
       delete guildList[guildId];
 
+      Database.logger.log(`Removed the guild ${guildId} to the database`);
       return guildId;
     }
     return undefined;

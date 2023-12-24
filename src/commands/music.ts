@@ -8,13 +8,12 @@ import {
 } from "discord.js";
 import { Updater, DefaultUpdater } from "../utils/Updater";
 import { AudioInfo, DefaultPlayer, Player } from "../utils/music/Player";
-import { Connection, DefaultConnection } from "../utils/music/Connection";
+import { CustomClient } from "../utils/Client";
 
 type InteractionType = ChatInputCommandInteraction;
 
 const updater: Updater = new DefaultUpdater("Music Player");
 const player: Player = new DefaultPlayer(updater);
-const connection: Connection = new DefaultConnection();
 
 const commandName = "music";
 enum Subcommand {
@@ -174,7 +173,6 @@ const executor: {
   },
   [Subcommand.Leave]: async (interaction) => {
     player.stop();
-    connection.leave();
     return updater.message({ description: "Left the voice channel" });
   },
   [Subcommand.Skip]: async (interaction) => {
@@ -239,6 +237,7 @@ const executor: {
 async function execute(interaction: InteractionType) {
   await interaction.deferReply();
 
+  const client = interaction.client as CustomClient;
   const subcommand = interaction.options.getSubcommand() as Subcommand;
   let status = subcommand === Subcommand.Leave;
 
@@ -247,10 +246,12 @@ async function execute(interaction: InteractionType) {
 
     const member = interaction.member as GuildMember;
     const userVoiceChannel = member.voice.channel as VoiceBasedChannel;
-    status = connection.connect(userVoiceChannel);
+    status = client.connection.connect(userVoiceChannel);
     if (status) {
-      connection.subcribe = player.player;
+      client.connection.subcribe = player.player;
     }
+  } else {
+    client.connection.leave();
   }
 
   const message: BaseMessageOptions = status

@@ -9,6 +9,7 @@ import {
 import fs from "node:fs";
 import path from "node:path";
 import { Database } from "./database/Database";
+import { Connection, DefaultConnection } from "./music/Connection";
 const rootPath = path.dirname(path.dirname(__filename));
 
 interface CommandObject {
@@ -20,6 +21,7 @@ interface CommandObject {
 class CustomClient extends Client {
   private commands: Collection<string, CommandObject>;
   private readonly clientId: string;
+  public readonly connection: Connection;
 
   constructor(options: ClientOptions) {
     super(options);
@@ -28,6 +30,19 @@ class CustomClient extends Client {
     }
     this.clientId = process.env.CLIENT_ID;
     this.commands = new Collection<string, CommandObject>();
+    this.connection = new DefaultConnection();
+  }
+
+  public async existingGuildCheck() {
+    const guildList = await this.guilds.fetch();
+
+    for (const guildId of guildList.keys()) {
+      if (!Database.guildList.includes(guildId)) {
+        Database.add(guildId);
+
+        console.log(`[DTB]: Added existing guild ${guildId} to the database.`);
+      }
+    }
   }
 
   public readCommands() {

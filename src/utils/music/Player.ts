@@ -187,8 +187,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
         this.logger.log(`Added ${NewAudio.length} songs to the player queue`);
         return NewAudio;
       } catch (error) {
-        const logError = error as Error;
-        this.logger.error(logError.message);
+        this.logger.error(error);
       }
     }
     return [];

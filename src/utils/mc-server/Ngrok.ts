@@ -95,8 +95,7 @@ class DefaultNgrok implements Ngrok {
         }
       }
     } catch (error) {
-      const logError = error as Error;
-      DefaultNgrok.logger.error(logError.message);
+      DefaultNgrok.logger.error(error);
     }
     return tunnel;
   }
@@ -112,8 +111,7 @@ class DefaultNgrok implements Ngrok {
           tunnel = undefined;
         }
       } catch (error) {
-        const logError = error as Error;
-        DefaultNgrok.logger.error(logError.message);
+        DefaultNgrok.logger.error(error);
       }
     }
     return tunnel;
@@ -146,8 +144,7 @@ class DefaultNgrok implements Ngrok {
         return tunnel;
       }
     } catch (error) {
-      const logError = error as Error;
-      DefaultNgrok.logger.error(logError.message);
+      DefaultNgrok.logger.error(error);
     }
     return undefined;
   }

@@ -94,8 +94,7 @@ class CustomClient extends Client {
       });
     } catch (error) {
       // And of course, make sure you catch and log any errors!
-      const logError = error as Error;
-      this.logger.error(logError.message);
+      this.logger.error(error);
     }
   }
 

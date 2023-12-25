@@ -77,8 +77,7 @@ class DefaultUpdater implements Updater {
     try {
       return this.textChannel?.send(this.message(message));
     } catch (error) {
-      const logError = error as Error;
-      DefaultUpdater.logger.error(logError.message);
+      DefaultUpdater.logger.error(error);
     }
   }
 }

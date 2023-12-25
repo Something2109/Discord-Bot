@@ -104,8 +104,7 @@ class DefaultServer implements Server {
         connection = ServerStatus.Starting;
       }
     } catch (error) {
-      const logError = error as Error;
-      this.logger.error(logError.message);
+      this.logger.error(error);
       this.killServer();
     }
     return connection;
@@ -142,8 +141,7 @@ class DefaultServer implements Server {
         connection = ServerStatus.Starting;
       }
     } catch (error) {
-      const logError = error as Error;
-      this.logger.error(logError.message);
+      this.logger.error(error);
     }
     return connection;
   }
@@ -300,8 +298,7 @@ class DefaultServer implements Server {
    * @param data The data error string.
    */
   private onError(error: any) {
-    const logError = error as Error;
-    this.logger.error(logError.message);
+    this.logger.error(error);
     this.updater.send({ description: "Server encounters error" });
     this.killServer();
   }

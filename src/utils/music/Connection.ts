@@ -78,8 +78,7 @@ class DefaultConnection implements Connection {
         entersState(this.connection!, Status.Connecting, 5_000),
       ]);
     } catch (error) {
-      const logError = error as Error;
-      this.logger.error(logError.message);
+      this.logger.error(error);
       await this.leave();
     }
   }

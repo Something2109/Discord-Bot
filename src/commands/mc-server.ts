@@ -163,10 +163,7 @@ const executor: {
     if (worldList) {
       if (world && worldList.getName(world)) {
         server.currentWorld = world;
-      } else if (
-        !server.currentWorld ||
-        !worldList.getName(server.currentWorld)
-      ) {
+      } else if (!worldList.getName(server.currentWorld)) {
         if (worldList.list.length === 0) {
           return updater.message({
             description: "No valid world is available run",

@@ -23,7 +23,7 @@ interface MultiWorldHandler {
   /**
    * Get the current world of the server if available.
    */
-  get currentWorld(): string | undefined;
+  get currentWorld(): string;
 
   /**
    * Change the world to the given world.
@@ -42,7 +42,7 @@ class DefaultMultiWorldServer
   private readonly PropertiesFileDirectory;
   private readonly WorldLevelRegex = /level-name=.+/;
 
-  private worldName: string | undefined;
+  private worldName: string;
 
   constructor(updater: Updater, directory?: string, fileName?: string) {
     super(updater, directory, fileName);
@@ -56,12 +56,13 @@ class DefaultMultiWorldServer
       "server.properties"
     );
 
-    const currentWorld = this.readLevelName();
+    let currentWorld = this.readLevelName();
     if (!currentWorld) {
-      this.writeLevelName();
-    } else {
-      this.logger.log(`Current world: ${currentWorld}`);
+      currentWorld = "default";
+      this.writeLevelName(currentWorld);
     }
+    this.worldName = currentWorld;
+    this.logger.log(`Current world: ${this.worldName}`);
   }
 
   isAvailable(world: string): boolean {
@@ -80,17 +81,12 @@ class DefaultMultiWorldServer
     return [];
   }
 
-  get currentWorld(): string | undefined {
-    if (!this.worldName) {
-      this.worldName = this.readLevelName();
-    }
+  get currentWorld(): string {
     return this.worldName;
   }
 
   set currentWorld(name: string) {
-    if (this.isAvailable(name) && this.worldName !== name) {
-      this.worldName = this.writeLevelName(name);
-    }
+    this.worldName = this.writeLevelName(name);
   }
 
   /**
@@ -113,7 +109,7 @@ class DefaultMultiWorldServer
    * Create one if none exist.
    * @param name The name of the world.
    */
-  private writeLevelName(name: string = "default") {
+  private writeLevelName(name: string) {
     let propertyData = `level-name=${path
       .join(this.WorldDirectory, name)
       .toString()

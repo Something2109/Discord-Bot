@@ -3,6 +3,7 @@ import { Updater } from "../Updater";
 import path from "node:path";
 import fs from "fs";
 import { Logger } from "../Logger";
+import { DefaultHost, DefaultNgrokHost, Host } from "./Host";
 
 /**
  * Server interface to use in other classes or functions.
@@ -26,6 +27,11 @@ interface Server {
    * The list of the players.
    */
   get list(): Array<PlayerInfo>;
+
+  /**
+   * Get the host of the server.
+   */
+  host(): Promise<string | undefined>;
 
   /**
    * Stop the minecraftv server.
@@ -52,9 +58,7 @@ interface PlayerInfo {
  * Minecraft server class used to control the minecraft server.
  */
 class DefaultServer implements Server {
-  protected readonly directory: string;
-  private readonly arguments: Array<string>;
-  private readonly timeoutMin: number;
+  protected readonly config: ServerConfig;
 
   private process: ChildProcess | undefined;
   private starting: boolean;
@@ -64,23 +68,13 @@ class DefaultServer implements Server {
   protected logger: Logger;
 
   constructor(updater: Updater, directory?: string, fileName?: string) {
-    [this.directory, fileName] = this.pathResolver(directory, fileName);
-    this.arguments = this.argumentResolver();
-    this.arguments.push("-jar", fileName);
-    this.timeoutMin = process.env.MC_TIMEOUT
-      ? parseFloat(process.env.MC_TIMEOUT)
-      : 6;
-    this.eulaResolver();
-
     this.process = undefined;
     this.starting = false;
     this.players = new Array();
     this.updater = updater;
     this.logger = new Logger("MCS");
 
-    this.logger.log(
-      `Server configures with directory: ${this.directory}, arguments: ${this.arguments}`
-    );
+    this.config = new ServerConfig(this.logger, directory, fileName);
   }
 
   public async start(): Promise<ServerStatus> {
@@ -112,10 +106,10 @@ class DefaultServer implements Server {
     return this.players;
   }
 
-  /**
-   * Stop the minecraftv server.
-   * @returns The server status showing the state of the server.
-   */
+  public async host() {
+    return await this.config.addressHost.get();
+  }
+
   public async stop(): Promise<ServerStatus> {
     let connection = await this.status();
     try {
@@ -133,80 +127,12 @@ class DefaultServer implements Server {
   }
 
   /**
-   * Check the validity of the directory if given else the specified env variables.
-   * @param directory The directory to check.
-   * @param filename The filename of the jar file.
-   * @returns The array contains the directory and server jar file to start the server.
-   */
-  private pathResolver(
-    directory = process.env.MC_DIR,
-    filename?: string
-  ): string[] {
-    if (!directory) {
-      throw new Error("Undefined directory.");
-    }
-    if (directory.endsWith(".jar")) {
-      directory = path.dirname(directory);
-    }
-
-    if (!filename) {
-      filename = directory.endsWith(".jar")
-        ? path.basename(directory)
-        : "server.jar";
-    } else if (!filename.endsWith(".jar")) {
-      throw new Error(`Invalid server jar file ${filename}.`);
-    }
-
-    if (!fs.existsSync(path.join(directory, filename))) {
-      throw new Error(`Cannot find server jar file from ${directory}.`);
-    }
-    return [directory, filename];
-  }
-
-  /**
-   * Add the argument to start server if valid else use the default value.
-   * @param initMem The initial memory given to the server when start.
-   * @param maxMem The maximum memory the server will take if needed.
-   * @param gui_enable Enable the GUI of the server.
-   * @returns The argument array to start the server.
-   */
-  private argumentResolver(
-    initMem = process.env.MC_INIT_MEMORY,
-    maxMem = process.env.MC_MAX_MEMORY,
-    gui_enable = process.env.MC_GUI
-  ): string[] {
-    const result = new Array();
-    result.push(
-      initMem && initMem.match(/^[0-9]*$/) ? `-Xms${initMem}M` : "-Xms2048M",
-      maxMem && maxMem.match(/^[0-9]*$/) ? `-Xmx${maxMem}M` : "-Xmx4096M"
-    );
-    if (!(gui_enable === "true")) {
-      result.push("-nogui");
-    }
-    return result;
-  }
-
-  /**
-   * Create or change the Eula file so the server can run.
-   */
-  private eulaResolver(): void {
-    const eulaPath = path.join(this.directory, "eula.txt");
-    if (fs.existsSync(eulaPath)) {
-      const data = fs.readFileSync(eulaPath).toString();
-      if (data.includes("eula=true")) {
-        return;
-      }
-    }
-    fs.writeFileSync(eulaPath, "eula=true");
-  }
-
-  /**
    * Run the server in the server directory given in the .env file.
    * @param updater The updater to update important info to the user.
    */
   private spawnServer() {
-    this.process = spawn("java", this.arguments, {
-      cwd: this.directory,
+    this.process = spawn("java", this.config.arguments, {
+      cwd: this.config.directory,
     });
     if (this.process) {
       this.process.stdout?.on("data", this.onData.bind(this));
@@ -295,7 +221,7 @@ class DefaultServer implements Server {
   private stopTimeoutManager() {
     if (this.players.length == 0 && !this.stopTimeout) {
       this.updater.send({
-        description: `Server has no player playing, close in ${this.timeoutMin} minutes`,
+        description: `Server has no player playing, close in ${this.config.timeoutMin} minutes`,
       });
 
       this.stopTimeout = setTimeout(() => {
@@ -303,7 +229,7 @@ class DefaultServer implements Server {
           description: "Server is stopping due to no player playing",
         });
         this.stop();
-      }, this.timeoutMin * 60000);
+      }, this.config.timeoutMin * 60000);
     } else if (this.players.length > 0 && this.stopTimeout) {
       clearTimeout(this.stopTimeout);
 
@@ -352,6 +278,159 @@ class DefaultServer implements Server {
     this.players.length = 0;
     clearTimeout(this.stopTimeout);
     this.stopTimeout = undefined;
+  }
+}
+
+/**
+ * Responsible for creating the argument of the server and editing the server property to run smoothly.
+ * Take the arguments fom the env variable to config the server.
+ */
+class ServerConfig {
+  public readonly directory: string;
+  public readonly arguments: Array<string>;
+  public readonly propertyFile: string;
+  public readonly addressHost: Host;
+  public readonly timeoutMin: number;
+
+  constructor(logger: Logger, directory?: string, fileName?: string) {
+    [this.directory, fileName] = this.pathResolver(directory, fileName);
+    this.arguments = this.argumentResolver();
+    this.arguments.push("-jar", fileName);
+    this.propertyFile = path.join(this.directory, "server.properties");
+
+    logger.log(
+      `Server configures with directory: ${this.directory}, arguments: ${this.arguments}`
+    );
+
+    this.timeoutMin = process.env.MC_TIMEOUT
+      ? parseFloat(process.env.MC_TIMEOUT)
+      : 6;
+    logger.log(`Set server's timeout to ${this.timeoutMin}`);
+
+    if (process.env.MC_ADDRESS) {
+      this.addressHost = new DefaultHost(process.env.MC_ADDRESS);
+      logger.log(`Set server's host to ${process.env.MC_ADDRESS}`);
+    } else {
+      this.addressHost = new DefaultNgrokHost(this.portResolver());
+      logger.log(`Set server's host with Ngrok`);
+    }
+
+    this.eulaResolver();
+  }
+
+  /**
+   * Check the validity of the directory if given else the specified env variables.
+   * @param directory The directory to check.
+   * @param filename The name of the jar file.
+   * @returns The array contains the directory and server jar file to start the server.
+   */
+  private pathResolver(
+    directory = process.env.MC_DIR,
+    filename?: string
+  ): string[] {
+    if (!directory) {
+      throw new Error("Undefined directory.");
+    }
+    if (directory.endsWith(".jar")) {
+      directory = path.dirname(directory);
+    }
+
+    if (!filename) {
+      filename = directory.endsWith(".jar")
+        ? path.basename(directory)
+        : "server.jar";
+    } else if (!filename.endsWith(".jar")) {
+      throw new Error(`Invalid server jar file ${filename}.`);
+    }
+
+    if (!fs.existsSync(path.join(directory, filename))) {
+      throw new Error(`Cannot find server jar file from ${directory}.`);
+    }
+    return [directory, filename];
+  }
+
+  /**
+   * Add the argument to start server if valid else use the default value.
+   * @param initMem The initial memory given to the server when start.
+   * @param maxMem The maximum memory the server will take if needed.
+   * @param gui_enable Enable the GUI of the server.
+   * @returns The argument array to start the server.
+   */
+  private argumentResolver(
+    initMem = process.env.MC_INIT_MEMORY,
+    maxMem = process.env.MC_MAX_MEMORY,
+    gui_enable = process.env.MC_GUI
+  ): string[] {
+    const result = new Array();
+    result.push(
+      initMem && initMem.match(/^[0-9]*$/) ? `-Xms${initMem}M` : "-Xms2048M",
+      maxMem && maxMem.match(/^[0-9]*$/) ? `-Xmx${maxMem}M` : "-Xmx4096M"
+    );
+    if (!(gui_enable === "true")) {
+      result.push("-nogui");
+    }
+    return result;
+  }
+
+  /**
+   * Create or change the Eula file so the server can run.
+   * @param directory The directory to check.
+   */
+  private eulaResolver(): void {
+    const eulaPath = path.join(this.directory, "eula.txt");
+    if (fs.existsSync(eulaPath)) {
+      const data = fs.readFileSync(eulaPath).toString();
+      if (data.includes("eula=true")) {
+        return;
+      }
+    }
+    fs.writeFileSync(eulaPath, "eula=true");
+  }
+
+  /**
+   * Read the minecraft port configuration from the property file.
+   * @returns the port number represented as a string.
+   */
+  private portResolver(): string {
+    const host = this.readProperty("server-port");
+    return host ? host : "25565";
+  }
+
+  /**
+   * Read the property file with the
+   * @param key The property key to read.
+   * @returns The value of the property if found or undefined.
+   */
+  public readProperty(key: string) {
+    const regex = new RegExp(`${key}=.*`);
+    if (fs.existsSync(this.propertyFile)) {
+      const fileData = fs.readFileSync(this.propertyFile).toString();
+      const hostProperty = fileData.match(regex);
+      if (hostProperty) {
+        return hostProperty[0].substring(key.length + 1);
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Write the property key and value to the property file.
+   * @param key The property key to write.
+   * @param value The property value to write.
+   */
+  public writeProperty(key: string, value: string) {
+    const regex = new RegExp(`${key}=.*`);
+    let propertyData = `${key}=${value}`;
+    if (fs.existsSync(this.propertyFile)) {
+      const fileData = fs.readFileSync(this.propertyFile).toString();
+      const worldProperty = fileData.match(regex);
+      if (worldProperty) {
+        propertyData = fileData.replace(worldProperty[0], propertyData);
+      } else {
+        propertyData = fileData.concat(propertyData);
+      }
+    }
+    fs.writeFileSync(this.propertyFile, propertyData);
   }
 }
 

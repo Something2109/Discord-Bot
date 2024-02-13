@@ -39,8 +39,6 @@ class DefaultMultiWorldServer
   implements MultiWorldServer
 {
   private readonly WorldDirectory;
-  private readonly PropertiesFileDirectory;
-  private readonly WorldLevelRegex = /level-name=.+/;
 
   private worldName: string;
 
@@ -49,12 +47,8 @@ class DefaultMultiWorldServer
     if (process.env.MC_WORLD_DIR) {
       this.WorldDirectory = process.env.MC_WORLD_DIR;
     } else {
-      this.WorldDirectory = path.join(this.directory, "world");
+      this.WorldDirectory = path.join(this.config.directory, "world");
     }
-    this.PropertiesFileDirectory = path.join(
-      this.directory,
-      "server.properties"
-    );
 
     let currentWorld = this.readLevelName();
     if (!currentWorld) {
@@ -94,14 +88,8 @@ class DefaultMultiWorldServer
    * @returns The name of the world if exists else undefined.
    */
   private readLevelName(): string | undefined {
-    if (fs.existsSync(this.PropertiesFileDirectory)) {
-      const fileData = fs.readFileSync(this.PropertiesFileDirectory).toString();
-      const worldProperty = fileData.match(this.WorldLevelRegex);
-      if (worldProperty) {
-        return path.basename(worldProperty[0].replace(/level-name=/, ""));
-      }
-    }
-    return undefined;
+    const worldPath = this.config.readProperty("level-name");
+    return worldPath ? path.basename(worldPath) : worldPath;
   }
 
   /**
@@ -110,23 +98,13 @@ class DefaultMultiWorldServer
    * @param name The name of the world.
    */
   private writeLevelName(name: string) {
-    let propertyData = `level-name=${path
+    let worldPath = path
       .join(this.WorldDirectory, name)
       .toString()
-      .replaceAll("\\", "\\\\")}`;
+      .replaceAll("\\", "\\\\");
     this.logger.log(`Set the server's world to ${name}`);
 
-    if (fs.existsSync(this.PropertiesFileDirectory)) {
-      const fileData = fs.readFileSync(this.PropertiesFileDirectory).toString();
-      const worldProperty = fileData.match(this.WorldLevelRegex);
-      if (worldProperty) {
-        propertyData = fileData.replace(this.WorldLevelRegex, propertyData);
-      } else {
-        propertyData = fileData.concat(propertyData);
-      }
-    }
-    fs.writeFileSync(this.PropertiesFileDirectory, propertyData);
-
+    this.config.writeProperty("level-name", worldPath);
     return name;
   }
 }

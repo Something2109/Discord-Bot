@@ -11,15 +11,15 @@ import {
   DefaultMultiWorldServer,
   MultiWorldServer,
 } from "../utils/mc-server/WorldHandler";
-import { DefaultNgrok, Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
 import { Updater, DefaultUpdater, MessageAPI } from "../utils/Updater";
 import { Database } from "../utils/database/Database";
+import { WorldList } from "../utils/database/List/WorldList";
 
 type InteractionType = ChatInputCommandInteraction;
 
 const updater: Updater = new DefaultUpdater("Minecraft Server");
 const server: MultiWorldServer = new DefaultMultiWorldServer(updater);
-const ngrok: Ngrok = new DefaultNgrok();
+let worldList: WorldList | undefined = undefined;
 
 const commandName = "mc-server";
 enum Subcommand {
@@ -67,13 +67,13 @@ function data(guildId: string) {
       subcommand = subcommand
         .setName(Subcommand.Start)
         .setDescription(description[Subcommand.Start]);
-      const worldList = Database.get(guildId)?.world;
-      if (worldList) {
+      const guildWorldList = Database.get(guildId)?.world;
+      if (guildWorldList) {
         subcommand.addStringOption((option) =>
           option
             .setName("world")
             .setDescription("The world to load")
-            .setChoices(...worldList.list)
+            .setChoices(...guildWorldList.list)
         );
       }
       return subcommand;
@@ -109,30 +109,29 @@ function data(guildId: string) {
 function getReply(
   subcommand: Subcommand,
   status: ServerStatus,
-  tunnel?: NgrokTunnel
+  host?: string
 ): BaseMessageOptions {
-  let worldReply: APIEmbedField = {
-    name: "World:",
-    value: server.currentWorld
-      ? server.currentWorld
-      : "No world is available now",
-  };
-  let ngrokReply: APIEmbedField = {
-    name: "Ngrok",
-    value: `Ngrok is not running`,
-  };
+  const field: APIEmbedField[] = [
+    {
+      name: "World:",
+      value: worldList?.getName(server.currentWorld)
+        ? worldList.getName(server.currentWorld)!
+        : "No world is available now",
+    },
+  ];
 
-  if (tunnel) {
-    if (ngrok.isMcTunnel(tunnel)) {
-      ngrokReply.value = `Ngrok running at ${tunnel.public_url}`;
-    } else {
-      ngrokReply.value = "Another application is using Ngrok now";
-    }
+  if (status !== ServerStatus.Offline) {
+    field.push({
+      name: "Host:",
+      value: host
+        ? host
+        : "Ngrok is not running or being used by other application.",
+    });
   }
 
   return updater.message({
     description: reply[subcommand][status],
-    field: [worldReply, ngrokReply],
+    field,
   });
 }
 
@@ -142,11 +141,10 @@ function getReply(
  * @returns True if can else false
  */
 async function isIdle(guildId: string | null) {
-  const worldList = Database.get(guildId!)?.world;
   const status = await server.status();
 
   return !(
-    status !== ServerStatus.Offline && !worldList?.getName(server.currentWorld!)
+    status !== ServerStatus.Offline && !worldList?.getName(server.currentWorld)
   );
 }
 
@@ -157,7 +155,6 @@ const executor: {
   ) => Promise<BaseMessageOptions>;
 } = {
   [Subcommand.Start]: async (interaction, subcommand) => {
-    const worldList = Database.get(interaction.guildId!)?.world;
     const world = interaction.options.getString("world");
 
     if (worldList) {
@@ -171,11 +168,8 @@ const executor: {
         }
         server.currentWorld = worldList.list[0].value;
       }
-      const [status, tunnel] = await Promise.all([
-        server.start(),
-        ngrok.start(),
-      ]);
-      return getReply(subcommand, status, tunnel);
+      const [status, host] = await Promise.all([server.start(), server.host()]);
+      return getReply(subcommand, status, host);
     }
 
     return updater.message({
@@ -183,18 +177,12 @@ const executor: {
     });
   },
   [Subcommand.Stop]: async (interaction, subcommand) => {
-    let [status, tunnel] = await Promise.all([server.stop(), ngrok.status()]);
-    if (ngrok.isMcTunnel(tunnel)) {
-      tunnel = await ngrok.stop();
-    }
-    return getReply(subcommand, status, tunnel);
+    let [status, host] = await Promise.all([server.stop(), server.host()]);
+    return getReply(subcommand, status, host);
   },
   [Subcommand.Status]: async (interaction, subcommand) => {
-    const [status, tunnel] = await Promise.all([
-      server.status(),
-      ngrok.status(),
-    ]);
-    return getReply(subcommand, status, tunnel);
+    const [status, host] = await Promise.all([server.status(), server.host()]);
+    return getReply(subcommand, status, host);
   },
   [Subcommand.List]: async (interaction, subcommand) => {
     const status = await server.status();
@@ -215,6 +203,7 @@ const executor: {
 
 async function execute(interaction: InteractionType) {
   await interaction.deferReply();
+  worldList = Database.get(interaction.guildId!)?.world;
 
   const idle = await isIdle(interaction.guildId);
   let message: BaseMessageOptions;

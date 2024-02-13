@@ -3,13 +3,12 @@ import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
 } from "discord.js";
-import { DefaultNgrok, Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
+import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
 import { DefaultUpdater, Updater } from "../utils/Updater";
 
 type InteractionType = ChatInputCommandInteraction;
 
 const updater: Updater = new DefaultUpdater("Ngrok");
-const ngrok: Ngrok = new DefaultNgrok();
 
 const commandName = "ngrok";
 enum Subcommand {
@@ -77,7 +76,7 @@ const executor: {
 } = {
   [Subcommand.Start]: async (interaction) => {
     const address = interaction.options.getString("addr");
-    const tunnel = address ? await ngrok.start(address) : undefined;
+    const tunnel = address ? await Ngrok.start(address) : undefined;
 
     return tunnel && tunnel.config.addr === address
       ? getReply(tunnel, "Start tunnel successfully.", "Cannot start tunnel.")
@@ -88,11 +87,11 @@ const executor: {
         });
   },
   [Subcommand.Status]: async (interaction) => {
-    const tunnel = await ngrok.status();
+    const tunnel = await Ngrok.status();
     return getReply(tunnel, "Tunnel:", "There's no tunnel running");
   },
   [Subcommand.Stop]: async (interaction) => {
-    const tunnel = await ngrok.stop();
+    const tunnel = await Ngrok.stop();
     return getReply(
       tunnel,
       "Cannot stop tunnel.",

@@ -1,6 +1,7 @@
 import { BannedWordList } from "./List/WordList";
 import path from "node:path";
 import { WorldList } from "./List/WorldList";
+import { WarningSentenceList } from "./List/SentenceList";
 
 /**
  * The class contains all the data relevant to a guild.
@@ -11,12 +12,14 @@ class GuildData {
   private readonly id;
   public bannedWord: BannedWordList;
   public world: WorldList;
+  public sentenceList: WarningSentenceList;
 
   constructor(id: string, basePath: string) {
     this.id = id;
     const savePath = path.join(basePath, this.id);
     this.bannedWord = new BannedWordList(savePath);
     this.world = new WorldList(savePath);
+    this.sentenceList = new WarningSentenceList(savePath);
   }
 }
 

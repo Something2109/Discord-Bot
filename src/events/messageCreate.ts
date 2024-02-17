@@ -7,11 +7,15 @@ module.exports = {
     const wordList = message.guild?.id
       ? Database.get(message.guild?.id)?.bannedWord
       : undefined;
+    const sentenceList = message.guild?.id
+      ? Database.get(message.guild?.id)?.sentenceList
+      : undefined;
     const bannedWords = wordList?.bannedWords;
 
     if (
       wordList &&
       bannedWords &&
+      sentenceList &&
       message.author.id !== process.env.CLIENT_ID
     ) {
       const wordContained = [
@@ -21,7 +25,11 @@ module.exports = {
         for (const word of wordContained) {
           wordList.count(word[0], message.author.id);
         }
-        message.reply(`Stop saying the banned word, ${message.author}`);
+
+        let replySentence = sentenceList.get();
+        if (!replySentence) replySentence = "Stop saying the banned word";
+
+        message.reply(`${replySentence}, ${message.author}`);
       }
     }
   },

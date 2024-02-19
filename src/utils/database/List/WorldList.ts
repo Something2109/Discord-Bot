@@ -1,4 +1,5 @@
 import { JsonLoader } from "../JsonLoader";
+import path from "node:path";
 
 interface MinecraftWorld {
   name: string;
@@ -8,20 +9,19 @@ interface MinecraftWorld {
 /**
  * Containing the list of world that a guild can use.
  */
-class WorldList extends JsonLoader {
-  protected SaveName = "world.json";
-  public list: MinecraftWorld[];
-  protected path: string;
-
-  constructor(path: string) {
-    super();
-    this.list = [];
-    this.path = path;
-    this.load();
+class WorldList extends JsonLoader<MinecraftWorld> {
+  constructor(filePath: string) {
+    super(path.join(filePath, "world.json"));
   }
 
+  /**
+   * Add a world data to the list.
+   * @param name The display name of the world.
+   * @param folderName The folder name of the world for the server to access.
+   * @returns The display name if successful else undefined.
+   */
   add(name: string, folderName: string): string | undefined {
-    if (!this.getName(name)) {
+    if (!this.get(folderName)) {
       this.list.push({
         name,
         value: folderName,
@@ -33,17 +33,30 @@ class WorldList extends JsonLoader {
     return undefined;
   }
 
-  getName(path: string) {
-    const index = this.list.find((world) => world.value == path);
-    return index?.name;
+  /**
+   * Get the display name from the folder name.
+   * @param folderName The folder name.
+   * @returns The display name if found else undefined.
+   */
+  get(folderName?: string | null) {
+    if (folderName) {
+      const index = this.list.find((world) => world.value == folderName);
+      return index;
+    }
+    return undefined;
   }
 
-  worldList() {
-    return this.list.map((world) => world.value);
+  get worldList() {
+    return this.list;
   }
 
-  remove(path: string): string | undefined {
-    const world = this.list.find((world) => world.value == path);
+  /**
+   * Remove a world from the list with the given display name.
+   * @param name The display name.
+   * @returns The display name if success else undefined.
+   */
+  remove(name: string): string | undefined {
+    const world = this.list.find((world) => world.value == name);
     if (world) {
       this.list.splice(this.list.indexOf(world), 1)[0];
       this.save();

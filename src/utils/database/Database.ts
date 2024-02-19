@@ -65,9 +65,9 @@ class Database {
    * @param guildId The id to get data.
    * @returns The data of the guild if database contains else undefined.
    */
-  static get(guildId: string) {
+  static get(guildId?: string) {
     const guildList = this.getInstance();
-    if (guildList[guildId] !== undefined) {
+    if (guildId && guildList[guildId] !== undefined) {
       return guildList[guildId];
     }
     return undefined;

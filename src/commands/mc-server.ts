@@ -19,7 +19,7 @@ type InteractionType = ChatInputCommandInteraction;
 
 const updater: Updater = new DefaultUpdater("Minecraft Server");
 const server: MultiWorldServer = new DefaultMultiWorldServer(updater);
-let worldList: WorldList | undefined = undefined;
+let worldData: WorldList | undefined = undefined;
 
 const commandName = "mc-server";
 enum Subcommand {
@@ -73,7 +73,7 @@ function data(guildId: string) {
           option
             .setName("world")
             .setDescription("The world to load")
-            .setChoices(...guildWorldList.list)
+            .setChoices(...guildWorldList.worldList)
         );
       }
       return subcommand;
@@ -104,6 +104,7 @@ function data(guildId: string) {
  * Get the reply to a specific command.
  * @param subcommand The subcommand of the interaction.
  * @param status Current status of the server.
+ * @param host The host of the server.
  * @returns The reply string.
  */
 function getReply(
@@ -111,21 +112,18 @@ function getReply(
   status: ServerStatus,
   host?: string
 ): BaseMessageOptions {
+  const currentWorld = worldData?.get(server.currentWorld);
   const field: APIEmbedField[] = [
     {
       name: "World:",
-      value: worldList?.getName(server.currentWorld)
-        ? worldList.getName(server.currentWorld)!
-        : "No world is available now",
+      value: currentWorld?.name ?? "No world is available now",
     },
   ];
 
   if (status !== ServerStatus.Offline) {
     field.push({
       name: "Host:",
-      value: host
-        ? host
-        : "Ngrok is not running or being used by other application.",
+      value: host ?? "Ngrok is not running or being used by other application.",
     });
   }
 
@@ -137,14 +135,13 @@ function getReply(
 
 /**
  * Check if this server is idle or running in current guild.
- * @param guildId The id of the guild.
  * @returns True if can else false
  */
-async function isIdle(guildId: string | null) {
+async function isIdle() {
   const status = await server.status();
 
   return !(
-    status !== ServerStatus.Offline && !worldList?.getName(server.currentWorld)
+    status !== ServerStatus.Offline && !worldData?.get(server.currentWorld)
   );
 }
 
@@ -157,17 +154,18 @@ const executor: {
   [Subcommand.Start]: async (interaction, subcommand) => {
     const world = interaction.options.getString("world");
 
-    if (worldList) {
-      if (world && worldList.getName(world)) {
-        server.currentWorld = world;
-      } else if (!worldList.getName(server.currentWorld)) {
-        if (worldList.list.length === 0) {
-          return updater.message({
-            description: "No valid world is available run",
-          });
-        }
-        server.currentWorld = worldList.list[0].value;
+    if (worldData) {
+      let worldFolder =
+        worldData.get(world)?.value ??
+        worldData.get(server.currentWorld)?.value ??
+        worldData.worldList[0]?.value;
+      if (!worldFolder) {
+        return updater.message({
+          description: "No valid world is available run",
+        });
       }
+
+      server.currentWorld = worldFolder;
       const [status, host] = await Promise.all([server.start(), server.host()]);
       return getReply(subcommand, status, host);
     }
@@ -203,9 +201,9 @@ const executor: {
 
 async function execute(interaction: InteractionType) {
   await interaction.deferReply();
-  worldList = Database.get(interaction.guildId!)?.world;
+  worldData = Database.get(interaction.guildId!)?.world;
 
-  const idle = await isIdle(interaction.guildId);
+  const idle = await isIdle();
   let message: BaseMessageOptions;
 
   if (idle) {

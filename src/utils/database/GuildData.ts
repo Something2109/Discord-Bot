@@ -2,6 +2,16 @@ import { BannedWordList } from "./List/WordList";
 import path from "node:path";
 import { WorldList } from "./List/WorldList";
 import { WarningSentenceList } from "./List/SentenceList";
+import { JsonLoader } from "./JsonLoader";
+
+/**
+ * The cache save cell.
+ * Contains the data and the timeout function.
+ */
+interface CacheRecord {
+  data: JsonLoader<any>;
+  timeout?: NodeJS.Timeout;
+}
 
 /**
  * The class contains all the data relevant to a guild.
@@ -9,17 +19,55 @@ import { WarningSentenceList } from "./List/SentenceList";
  * placed in the base folder added when creation.
  */
 class GuildData {
-  private readonly id;
-  public bannedWord: BannedWordList;
-  public world: WorldList;
-  public sentenceList: WarningSentenceList;
+  private readonly id: string;
+  private readonly savePath: string;
+  private readonly cache: { [key: string]: CacheRecord };
 
   constructor(id: string, basePath: string) {
     this.id = id;
-    const savePath = path.join(basePath, this.id);
-    this.bannedWord = new BannedWordList(savePath);
-    this.world = new WorldList(savePath);
-    this.sentenceList = new WarningSentenceList(savePath);
+    this.savePath = path.join(basePath, this.id);
+    this.cache = {};
+  }
+
+  get bannedWord() {
+    return this.getData(BannedWordList, 60);
+  }
+
+  get world() {
+    return this.getData(WorldList);
+  }
+
+  get sentenceList() {
+    return this.getData(WarningSentenceList);
+  }
+
+  /**
+   * Check the  cache if contains the data.
+   * If has, update the timeout and return the data from there.
+   * Else, create a record in the cache and return the data.
+   * @param c The class to check.
+   * @param cachetime The time (by minute) to keep the file in the cache before delete.
+   * @returns
+   */
+  private getData<T extends JsonLoader<any>>(
+    c: { new (path: string): T },
+    cachetime: number = 1
+  ): T {
+    const key = c.name;
+    if (!this.cache[key]) {
+      this.cache[key] = {
+        data: new c(this.savePath),
+      };
+    } else {
+      clearTimeout(this.cache[key].timeout);
+    }
+
+    this.cache[key].timeout =
+      cachetime > 0
+        ? setTimeout(() => delete this.cache[key], cachetime * 60000)
+        : undefined;
+
+    return this.cache[key].data as T;
   }
 }
 

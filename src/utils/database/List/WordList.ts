@@ -1,4 +1,5 @@
 import { JsonLoader } from "../JsonLoader";
+import path from "node:path";
 
 interface WordRankingList {
   word: string;
@@ -14,23 +15,16 @@ type Ranking = {
 /**
  * Contains the saved words and the number count of each user to each word.
  */
-class WordList extends JsonLoader {
-  protected SaveName = "banned-word.json";
-  protected list: WordRankingList[];
-  protected path: string;
-
-  constructor(path: string) {
-    super();
-    this.list = [];
-    this.path = path;
-    this.load();
+class WordList extends JsonLoader<WordRankingList> {
+  constructor(filePath: string) {
+    super(path.join(filePath, "banned-word.json"));
   }
 
   /**
    * Get the regex to extract banned word from text.
    */
   get bannedWords(): RegExp | undefined {
-    return this.list.length > 0
+    return !this.isEmpty()
       ? new RegExp(
           `(?:[".(_*-]|\\b|^)(${this.list
             .map((x) => x.word)

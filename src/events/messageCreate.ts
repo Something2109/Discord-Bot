@@ -4,29 +4,24 @@ import { Database } from "../utils/database/Database";
 module.exports = {
   name: Events.MessageCreate,
   async execute(message: Message) {
-    const wordList = message.guild?.id
-      ? Database.get(message.guild?.id)?.bannedWord
-      : undefined;
-    const sentenceList = message.guild?.id
-      ? Database.get(message.guild?.id)?.sentenceList
-      : undefined;
-    const bannedWords = wordList?.bannedWords;
+    const guildData = Database.get(message.guild?.id);
 
     if (
-      wordList &&
-      bannedWords &&
-      sentenceList &&
+      guildData &&
+      !guildData.bannedWord.isEmpty() &&
       message.author.id !== process.env.CLIENT_ID
     ) {
       const wordContained = [
-        ...message.content.toLowerCase().matchAll(wordList.bannedWords),
+        ...message.content
+          .toLowerCase()
+          .matchAll(guildData.bannedWord.bannedWords!),
       ];
       if (wordContained.length > 0) {
         for (const word of wordContained) {
-          wordList.count(word[0], message.author.id);
+          guildData.bannedWord.count(word[0], message.author.id);
         }
 
-        let replySentence = sentenceList.get();
+        let replySentence = guildData.sentenceList.get();
         if (!replySentence) replySentence = "Stop saying the banned word";
 
         message.reply(`${replySentence}, ${message.author}`);

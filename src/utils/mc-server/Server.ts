@@ -393,7 +393,7 @@ class ServerConfig {
    */
   private portResolver(): string {
     const host = this.readProperty("server-port");
-    return host ? host : "25565";
+    return host ?? "25565";
   }
 
   /**

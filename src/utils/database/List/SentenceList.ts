@@ -1,18 +1,12 @@
 import { JsonLoader } from "../JsonLoader";
+import path from "node:path";
 
 /**
  * Contains the saved words and the number count of each user to each word.
  */
-class SentenceList extends JsonLoader {
-  protected SaveName = "warning-sentence.json";
-  protected list: string[];
-  protected path: string;
-
-  constructor(path: string) {
-    super();
-    this.list = [];
-    this.path = path;
-    this.load();
+class SentenceList extends JsonLoader<string> {
+  constructor(filePath: string) {
+    super(path.join(filePath, "warning-sentence.json"));
   }
 
   /**

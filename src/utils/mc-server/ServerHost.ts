@@ -1,6 +1,6 @@
 import { Ngrok } from "./Ngrok";
 
-interface Host {
+interface ServerHost {
   /**
    * Get the running host address.
    * @return the host address or undefined if none running.
@@ -8,7 +8,7 @@ interface Host {
   get(): Promise<string | undefined>;
 }
 
-class DefaultHost implements Host {
+class DefaultServerHost implements ServerHost {
   private host: string;
 
   constructor(host: string) {
@@ -20,7 +20,7 @@ class DefaultHost implements Host {
   }
 }
 
-class DefaultNgrokHost implements Host {
+class DefaultNgrokServerHost implements ServerHost {
   private address: string;
 
   constructor(port: string = "25565") {
@@ -37,4 +37,4 @@ class DefaultNgrokHost implements Host {
   }
 }
 
-export { Host, DefaultHost, DefaultNgrokHost };
+export { ServerHost, DefaultServerHost, DefaultNgrokServerHost };

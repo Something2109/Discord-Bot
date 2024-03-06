@@ -6,11 +6,7 @@ import {
   APIEmbedField,
   TextBasedChannel,
 } from "discord.js";
-import { ServerStatus } from "../utils/mc-server/Server";
-import {
-  DefaultMultiWorldServer,
-  MultiWorldServer,
-} from "../utils/mc-server/WorldHandler";
+import { DefaultServer, Server, ServerStatus } from "../utils/mc-server/Server";
 import { Updater, DefaultUpdater, MessageAPI } from "../utils/Updater";
 import { Database } from "../utils/database/Database";
 import { WorldList } from "../utils/database/List/WorldList";
@@ -18,7 +14,7 @@ import { WorldList } from "../utils/database/List/WorldList";
 type InteractionType = ChatInputCommandInteraction;
 
 const updater: Updater = new DefaultUpdater("Minecraft Server");
-const server: MultiWorldServer = new DefaultMultiWorldServer(updater);
+const server: Server = new DefaultServer(updater);
 let worldData: WorldList | undefined = undefined;
 
 const commandName = "mc-server";
@@ -112,7 +108,7 @@ function getReply(
   status: ServerStatus,
   host?: string
 ): BaseMessageOptions {
-  const currentWorld = worldData?.get(server.currentWorld);
+  const currentWorld = worldData?.get(server.world);
   const field: APIEmbedField[] = [
     {
       name: "World:",
@@ -140,9 +136,7 @@ function getReply(
 async function isIdle() {
   const status = await server.status();
 
-  return !(
-    status !== ServerStatus.Offline && !worldData?.get(server.currentWorld)
-  );
+  return !(status !== ServerStatus.Offline && !worldData?.get(server.world));
 }
 
 const executor: {
@@ -157,7 +151,7 @@ const executor: {
     if (worldData) {
       let worldFolder =
         worldData.get(world)?.value ??
-        worldData.get(server.currentWorld)?.value ??
+        worldData.get(server.world)?.value ??
         worldData.worldList[0]?.value;
       if (!worldFolder) {
         return updater.message({
@@ -165,7 +159,7 @@ const executor: {
         });
       }
 
-      server.currentWorld = worldFolder;
+      server.world = worldFolder;
       const [status, host] = await Promise.all([server.start(), server.host()]);
       return getReply(subcommand, status, host);
     }
@@ -187,8 +181,8 @@ const executor: {
     let message: MessageAPI = {
       description: reply[subcommand][status],
     };
-    if (server.list.length > 0) {
-      message.field = server.list.map((player) => {
+    if (server.playerList.length > 0) {
+      message.field = server.playerList.map((player) => {
         return {
           name: player.name,
           value: `Time joined: ${player.time.toLocaleString()}`,

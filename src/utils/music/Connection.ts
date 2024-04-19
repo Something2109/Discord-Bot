@@ -53,6 +53,7 @@ class DefaultConnection implements Connection {
       guildId: channel.guildId,
       adapterCreator: channel.guild.voiceAdapterCreator,
     });
+    this.connection.on("error", this.onError.bind(this));
     this.connection.on("stateChange", this.onStageChange.bind(this));
     this.connection.on(Status.Disconnected, this.onDisconnected.bind(this));
   }
@@ -81,6 +82,11 @@ class DefaultConnection implements Connection {
       this.logger.error(error);
       await this.leave();
     }
+  }
+
+  private async onError(error: Error) {
+    this.logger.error(error);
+    this.leave();
   }
 
   private get connection(): VoiceConnection | undefined {

@@ -121,7 +121,7 @@ class WordList extends JsonLoader<WordRankingList> {
 
     this.list.forEach(({ word, list }) => {
       if (userId) {
-        const userCount = list.find((value) => (value.id = userId));
+        const userCount = list.find((value) => value.id == userId);
         if (userCount) {
           ranking.push({ word, count: userCount.count });
         }

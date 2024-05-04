@@ -1,8 +1,4 @@
-import {
-  Events,
-  BaseInteraction,
-  ChatInputCommandInteraction,
-} from "discord.js";
+import { Events, BaseInteraction } from "discord.js";
 import { CustomClient } from "../utils/Client";
 
 module.exports = {
@@ -24,6 +20,9 @@ module.exports = {
       await command?.execute(interaction);
     } catch (error) {
       client.logger.error(`Error executing ${commandName}`);
+      if (interaction.isChatInputCommand() || interaction.isButton()) {
+        interaction.editReply(`Error executing ${commandName}`);
+      }
       console.error(error);
     }
   },

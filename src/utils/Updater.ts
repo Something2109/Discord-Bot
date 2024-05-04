@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import { Logger } from "./Logger";
 
+const MaxFieldNumber = 25;
 interface MessageAPI {
   title?: string;
   description: string;
@@ -60,6 +61,14 @@ class DefaultUpdater implements Updater {
   }
 
   public message(message: MessageAPI): BaseMessageOptions {
+    if (message.field && message.field.length > MaxFieldNumber) {
+      const residual = message.field.length - (MaxFieldNumber - 1);
+      message.field = message.field.slice(0, MaxFieldNumber);
+      message.field[24] = {
+        name: "And",
+        value: `${residual} more...`,
+      };
+    }
     const embed = {
       color: 0x0099ff,
       title: this.title,

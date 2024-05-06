@@ -18,4 +18,4 @@ client.initiateEvent();
 // Log in to Discord with your client's token
 client.login(process.env.TOKEN);
 
-client.existingGuildCheck().then(client.refreshCommands.bind(client));
+client.existingGuildCheck().then(client.refreshCommandsAll.bind(client));

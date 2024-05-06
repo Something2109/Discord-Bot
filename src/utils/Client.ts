@@ -19,6 +19,12 @@ interface CommandObject {
   execute(interaction: any): Promise<void>;
 }
 
+/**
+ * The class responsible for communicating and executing
+ * Discord related interactions.
+ * Contains functions for updating and managing commands
+ * and events of the bot.
+ */
 class CustomClient extends Client {
   private commands: Collection<string, CommandObject>;
   private readonly clientId: string;
@@ -38,6 +44,10 @@ class CustomClient extends Client {
     this.logger.log("Creating client");
   }
 
+  /**
+   * Check the availability in the database of all the guilds
+   * the client is currently in.
+   */
   public async existingGuildCheck() {
     const guildList = await this.guilds.fetch();
 
@@ -50,6 +60,10 @@ class CustomClient extends Client {
     }
   }
 
+  /**
+   * Load the commands from all the commands declaration files
+   * located in the commands folder from the root.
+   */
   public readCommands() {
     const commandsPath = path.join(rootPath, "commands");
     const commandFiles = fs
@@ -69,39 +83,10 @@ class CustomClient extends Client {
     }
   }
 
-  public refreshCommands() {
-    try {
-      const rest = new REST().setToken(process.env.TOKEN!);
-
-      this.logger.log(`Started refreshing application (/) commands`);
-
-      Database.guildList.forEach((guildId) => {
-        const guildCommands = this.commands.map((command) =>
-          command.data(guildId).toJSON()
-        );
-
-        // The put method is used to fully refresh all commands in the guild with the current set
-        rest
-          .put(Routes.applicationGuildCommands(this.clientId, guildId), {
-            body: guildCommands,
-          })
-          .then((data) => {
-            const refreshed = data as Object[];
-            this.logger.log(
-              `Successfully reloaded ${refreshed.length} application (/) commands to server ${guildId}`
-            );
-          });
-      });
-    } catch (error) {
-      // And of course, make sure you catch and log any errors!
-      this.logger.error(error);
-    }
-  }
-
-  public getCommand(commandName: string | undefined) {
-    return commandName ? this.commands.get(commandName) : undefined;
-  }
-
+  /**
+   * Load the event from all the event declaration files
+   * located in the events folder from the root.
+   */
   public initiateEvent() {
     const eventsPath = path.join(rootPath, "events");
     const eventFiles = fs
@@ -115,6 +100,47 @@ class CustomClient extends Client {
         ? this.once(event.name, (...args) => event.execute(...args))
         : this.on(event.name, (...args) => event.execute(...args));
     }
+  }
+
+  /**
+   * Refresh the command for all the guilds.
+   */
+  public refreshCommandsAll() {
+    this.logger.log(
+      `Started refreshing application (/) commands for all guilds`
+    );
+
+    Database.guildList.forEach((guildId) => {
+      this.refreshCommands(guildId);
+    });
+  }
+
+  /**
+   * Refresh commands for a specified server.
+   * @param guildId The guild id to refresh.
+   */
+  public async refreshCommands(guildId: string) {
+    try {
+      const rest = new REST().setToken(process.env.TOKEN!);
+      const route = Routes.applicationGuildCommands(this.clientId, guildId);
+      const body = this.commands.map((command) =>
+        command.data(guildId).toJSON()
+      );
+
+      // The put method is used to fully refresh all commands in the guild with the current set
+      await rest.put(route, { body });
+
+      this.logger.log(
+        `Successfully reloaded application (/) commands to server ${guildId}`
+      );
+    } catch (error) {
+      // And of course, make sure you catch and log any errors!
+      this.logger.error(error);
+    }
+  }
+
+  public getCommand(commandName: string | undefined) {
+    return commandName ? this.commands.get(commandName) : undefined;
   }
 }
 

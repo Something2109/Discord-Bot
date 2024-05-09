@@ -24,20 +24,22 @@ interface Player {
    * @param channel The channel of the sent request to send update.
    * @returns The Audio info of the song added to the queue or undefined.
    */
-  add(url: string | null): Promise<AudioInfo[]>;
+  add(url: string): Promise<AudioInfo[]>;
 
   /**
-   * Remove a song from the queue.
-   * @param {number} number The number of the song in the queue.
+   * Remove songs from the queue.
+   * @param position The position of the first element to be removed.
+   * @param number The number of the song in the queue.
    * @returns the audio info of the song removed from the queue or undefined.
    */
-  remove(number: number | null): AudioInfo | undefined;
+  remove(position: number, number: number | null): AudioInfo[];
 
   /**
-   * Skip the playing song.
+   * Skip the playing song and next song in the queue.
+   * @param number The number of the song to be skipped.
    * @returns The audio info of the skipped song.
    */
-  skip(): AudioInfo | undefined;
+  skip(number: number | null): AudioInfo[];
 
   /**
    * Stop the player from continue playing.
@@ -72,13 +74,13 @@ interface Player {
    * Make the player starts playing loop.
    * @returns The audio info of the current (loop) song.
    */
-  loop(): AudioInfo | undefined;
+  loop(): AudioInfo[];
 
   /**
    * Make the player stops playing loop.
    * @returns The audio info of the current song.
    */
-  unloop(): AudioInfo | undefined;
+  unloop(): AudioInfo[];
 }
 
 interface AudioInfo {
@@ -173,42 +175,46 @@ class DefaultPlayer extends AudioPlayer implements Player {
     return this;
   }
 
-  public async add(str: string | null): Promise<AudioInfo[]> {
-    if (str) {
-      try {
-        const NewAudio = await new Youtube().get(str);
-        if (NewAudio) {
-          this.queue = this.queue.concat(NewAudio);
-          if (!this.playing) {
-            this.playing = this.queue.shift();
-            this.play();
-          }
+  public async add(str: string): Promise<AudioInfo[]> {
+    try {
+      const NewAudio = await new Youtube().get(str);
+      if (NewAudio) {
+        this.queue = this.queue.concat(NewAudio);
+        if (!this.playing) {
+          this.playing = this.queue.shift();
+          this.play();
         }
-        this.logger.log(`Added ${NewAudio.length} songs to the player queue`);
-        return NewAudio;
-      } catch (error) {
-        this.logger.error(error);
       }
+      this.logger.log(`Added ${NewAudio.length} songs to the player queue`);
+      return NewAudio;
+    } catch (error) {
+      this.logger.error(error);
     }
     return [];
   }
 
-  public remove(number: number | null): AudioInfo | undefined {
-    if (number && number > 0 && number <= this.queue.length) {
-      let removed = this.queue.splice(number - 1, 1);
-
-      this.logger.log(`Removed ${removed[0].title} from the player queue`);
-      return removed[0];
+  public remove(position: number, number: number | null): AudioInfo[] {
+    if (!number || number < 1) {
+      number = 1;
     }
-    return undefined;
+    let removed = this.queue.splice(position - 1, number);
+
+    this.logger.log(`Removed ${removed.length} from the player queue`);
+    return removed;
   }
 
-  public skip(): AudioInfo | undefined {
-    const oldSong = this.playing;
-    super.stop(true);
+  public skip(number: number | null): AudioInfo[] {
+    const result = [];
+    if (this.playing) {
+      result.push(this.playing);
+      if (number) {
+        result.push(...this.remove(1, number - 1));
+      }
+    }
+    super.stop();
 
-    this.logger.log(`Skipped ${oldSong?.title} from playing`);
-    return oldSong;
+    this.logger.log(`Skipped ${result.length} songs from playing`);
+    return result;
   }
 
   public stop(force?: boolean) {
@@ -231,18 +237,28 @@ class DefaultPlayer extends AudioPlayer implements Player {
     return oldQueue;
   }
 
-  loop(): AudioInfo | undefined {
+  loop(): AudioInfo[] {
     this.looping = true;
 
+    const result = [];
+    if (this.playing) {
+      result.push(this.playing);
+    }
+
     this.logger.log(`Started looping mode`);
-    return this.playing;
+    return result;
   }
 
-  unloop(): AudioInfo | undefined {
+  unloop(): AudioInfo[] {
     this.looping = false;
 
+    const result = [];
+    if (this.playing) {
+      result.push(this.playing);
+    }
+
     this.logger.log(`Stopped looping mode`);
-    return this.playing;
+    return result;
   }
 }
 

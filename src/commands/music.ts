@@ -65,9 +65,14 @@ const data = (guildId: string) =>
         .setDescription(description[Subcommand.Remove])
         .addNumberOption((option) =>
           option
-            .setName("number")
+            .setName("position")
             .setDescription("The place of the song in the queue")
             .setRequired(true)
+        )
+        .addNumberOption((option) =>
+          option
+            .setName("number")
+            .setDescription("The number of songs to removed")
         )
     )
     .addSubcommand((subcommand) =>
@@ -79,6 +84,9 @@ const data = (guildId: string) =>
       subcommand
         .setName(Subcommand.Skip)
         .setDescription(description[Subcommand.Skip])
+        .addNumberOption((option) =>
+          option.setName("number").setDescription("The number of songs to skip")
+        )
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -116,25 +124,6 @@ const data = (guildId: string) =>
         .setDescription(description[Subcommand.Unloop])
     );
 
-function getReplyFromInfo(
-  audio: AudioInfo | undefined,
-  onExist: string,
-  onEmpty: string
-) {
-  if (audio) {
-    return updater.message({
-      description: onExist,
-      field: [
-        {
-          name: audio.title,
-          value: audio.url,
-        },
-      ],
-    });
-  }
-  return updater.message({ description: onEmpty });
-}
-
 function getReplyFromList(
   audio: AudioInfo[],
   onExist: string,
@@ -158,14 +147,15 @@ const executor: {
   ) => Promise<BaseMessageOptions>;
 } = {
   [Subcommand.Add]: async (interaction) => {
-    const url = interaction.options.getString("url");
+    const url = interaction.options.getString("url", true);
     const newAudio = await player.add(url);
     return getReplyFromList(newAudio, "Add a song:", "Invalid link");
   },
   [Subcommand.Remove]: async (interaction) => {
+    const position = interaction.options.getNumber("position", true);
     const number = interaction.options.getNumber("number");
-    const removed = player.remove(number!);
-    return getReplyFromInfo(
+    const removed = player.remove(position, number);
+    return getReplyFromList(
       removed,
       "Remove the song:",
       "Failed to remove song from the queue"
@@ -176,8 +166,9 @@ const executor: {
     return updater.message({ description: "Left the voice channel" });
   },
   [Subcommand.Skip]: async (interaction) => {
-    const skipped = player[Subcommand.Skip]();
-    return getReplyFromInfo(
+    const number = interaction.options.getNumber("number");
+    const skipped = player[Subcommand.Skip](number);
+    return getReplyFromList(
       skipped,
       "Skip the song",
       "There's no song playing"
@@ -218,11 +209,11 @@ const executor: {
   },
   [Subcommand.Loop]: async (interaction) => {
     const loop = player[Subcommand.Loop]();
-    return getReplyFromInfo(loop, "Loop the song:", "Starts looping.");
+    return getReplyFromList(loop, "Loop the song:", "Starts looping.");
   },
   [Subcommand.Unloop]: async (interaction) => {
     const unloop = player[Subcommand.Unloop]();
-    return getReplyFromInfo(
+    return getReplyFromList(
       unloop,
       "Stops looping the song:",
       "Stops looping."

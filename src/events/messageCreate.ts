@@ -6,15 +6,11 @@ module.exports = {
   async execute(message: Message) {
     const guildData = Database.get(message.guild?.id);
 
-    if (
-      guildData &&
-      !guildData.bannedWord.isEmpty() &&
-      message.author.id !== process.env.CLIENT_ID
-    ) {
+    if (guildData && message.author.id !== process.env.CLIENT_ID) {
       const wordContained = [
         ...message.content
           .toLowerCase()
-          .matchAll(guildData.bannedWord.bannedWords!),
+          .matchAll(guildData.bannedWord.bannedWords),
       ];
       if (wordContained.length > 0) {
         for (const word of wordContained) {

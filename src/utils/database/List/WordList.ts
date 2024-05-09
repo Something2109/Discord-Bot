@@ -23,15 +23,13 @@ class WordList extends JsonLoader<WordRankingList> {
   /**
    * Get the regex to extract banned word from text.
    */
-  get bannedWords(): RegExp | undefined {
-    return !this.isEmpty()
-      ? new RegExp(
-          `(?:[".(_*-]|\\b|^)(${this.list
-            .map((x) => x.word)
-            .join("|")})(?:[".)_*-]|\\b|$)`,
-          "g"
-        )
-      : undefined;
+  get bannedWords(): RegExp {
+    const regex = !this.isEmpty()
+      ? `(?:[".(_*-]|\\b|^)(${this.list
+          .map((x) => x.word)
+          .join("|")})(?:[".)_*-]|\\b|$)`
+      : "a^";
+    return new RegExp(regex, "g");
   }
 
   /**

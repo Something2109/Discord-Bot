@@ -2,8 +2,7 @@ import { Collection } from "discord.js";
 import readline from "readline";
 import fs from "fs";
 import path from "node:path";
-
-type CliExecutor = (input: string[]) => string;
+import { CliController } from "./controller/Console";
 
 class ConsoleLineInterface {
   private static terminal = ConsoleLineInterface.createInterface(
@@ -35,7 +34,7 @@ class ConsoleLineInterface {
     ConsoleLineInterface.pause();
 
     const time = new Date().toLocaleString();
-    const log = `[${time}][${src}]: ${message}.`;
+    const log = `[${time}][${src}]: ${message}`;
 
     console.log(log);
     Log.push(log, force);
@@ -97,9 +96,23 @@ class ConsoleLineInterface {
    *
    * @returns The command collection object.
    */
-  private static initiateCommands(): Collection<string, CliExecutor> {
-    const commands = new Collection<string, CliExecutor>();
-    commands.set("exit", ConsoleLineInterface.exit);
+  private static initiateCommands(): Collection<string, CliController> {
+    const commands = new Collection<string, CliController>();
+    commands.set("help", {
+      name: "help",
+      help: () => `help: Show the command list and their functionalities.`,
+      execute: async () => ConsoleLineInterface.help(),
+    });
+    commands.set("exit", {
+      name: "exit",
+      help: () => `exit: Exit the command line and terminate the bot.`,
+      execute: async () => {
+        setTimeout(() => {
+          ConsoleLineInterface.exit();
+        }, 1000);
+        return "Exitting the program";
+      },
+    });
     return commands;
   }
 
@@ -109,38 +122,47 @@ class ConsoleLineInterface {
    * @param input The input string from the readline interface.
    */
   private static onNewLine(input: string) {
-    ConsoleLineInterface.terminal.pause();
-
     if (input.length > 0) {
+      ConsoleLineInterface.terminal.pause();
+
       const [commandName, ...option] = input.split(" ");
       const executor = commandName
         ? ConsoleLineInterface.commands.get(commandName)
         : null;
+
       if (executor) {
-        const result = executor(option);
-        ConsoleLineInterface.log(result, "CLI", commandName == "exit");
+        executor.execute(option).then((result: string) => {
+          ConsoleLineInterface.log(result, "CLI", commandName == "exit");
+        });
       } else {
         ConsoleLineInterface.log(
           `Cannot find command name from key ${commandName}`
         );
       }
     }
+  }
 
-    ConsoleLineInterface.terminal.prompt();
+  /**
+   * The function called when executing the help command.
+   * Create a list of commands description.
+   * @returns The list of commands the cli can execute.
+   */
+  private static help() {
+    let result: string = "Available commands:\n";
+    result = result.concat(
+      ConsoleLineInterface.commands.map((value) => value.help()).join("\n")
+    );
+    return result;
   }
 
   /**
    * The function called when there's an exit signal from the console like
    * the exit command or the sigint signal from the interface.
-   * Treated by the class as a CliExecutor function.
    * @returns The string indicate the exit of the program.
    */
   private static exit() {
-    setTimeout(() => {
-      ConsoleLineInterface.terminal.close();
-      process.exit();
-    }, 1000);
-    return "Exitting the program";
+    ConsoleLineInterface.terminal.close();
+    process.exit();
   }
 }
 

@@ -2,161 +2,204 @@ import {
   APIEmbedField,
   BaseMessageOptions,
   ChatInputCommandInteraction,
-  SlashCommandBuilder,
+  SlashCommandStringOption,
+  SlashCommandUserOption,
   userMention,
 } from "discord.js";
 import { Updater, DefaultUpdater } from "../utils/Updater";
 import { Database } from "../utils/database/Database";
 import { BannedWordList, Ranking } from "../utils/database/List/WordList";
+import {
+  CommandExecutor,
+  OptionExtraction,
+  SubcommandExecutor,
+} from "../utils/controller/Executor";
+import {
+  DiscordSubcommandController,
+  DiscordSubcommandOption,
+} from "../utils/controller/Discord";
 
 type InteractionType = ChatInputCommandInteraction;
 
-const updater: Updater = new DefaultUpdater("Word ranking");
-
-const commandName = "word-ranking";
-enum Subcommand {
+enum SubcommandNames {
   Add = "add",
   List = "list",
   Remove = "remove",
   Ranking = "ranking",
 }
 
-const description: { [key in Subcommand]: string } = {
-  [Subcommand.Add]: "Add word to ban",
-  [Subcommand.Remove]: "Remove word from banned list",
-  [Subcommand.Ranking]: "Show the local ranking of saying banned words",
-  [Subcommand.List]: "Show the banned word list",
-};
+abstract class NgrokSubcommandController extends CommandExecutor {
+  static wordList?: BannedWordList;
+  static result: Ranking[];
 
-const data = (guildId: string) =>
-  new SlashCommandBuilder()
-    .setName(commandName)
-    .setDescription("Tracking and ranking words")
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName(Subcommand.Add)
-        .setDescription(description[Subcommand.Add])
-        .addStringOption((option) =>
-          option
-            .setName("word")
-            .setDescription("The word to track")
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName(Subcommand.List)
-        .setDescription(description[Subcommand.List])
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName(Subcommand.Remove)
-        .setDescription(description[Subcommand.Remove])
-        .addStringOption((option) =>
-          option
-            .setName("word")
-            .setDescription("The word to delete")
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName(Subcommand.Ranking)
-        .setDescription(description[Subcommand.Ranking])
-        .addUserOption((option) =>
-          option.setName("user").setDescription("The user to search")
-        )
-        .addStringOption((option) =>
-          option.setName("word").setDescription("The word to search")
-        )
-    );
-
-function toRankingList(list: Ranking[]): APIEmbedField[] {
-  return list.map(({ id, word, count }, index) => {
-    return {
-      name: `#${index + 1}. Typed count: ${count}`,
-      value: id ? userMention(id) : word ? word : "",
-    };
-  });
-}
-
-const executor: {
-  [key in Subcommand]: (
-    interaction: InteractionType,
-    wordList: BannedWordList
-  ) => BaseMessageOptions;
-} = {
-  [Subcommand.Add]: (interaction, wordList) => {
-    const word = interaction.options.getString("word")?.trim().toLowerCase();
-    const reply = wordList.add(word!)
-      ? `Added the word ${word} to the tracking list.`
-      : `Failed to add the word`;
-
-    return updater.message({
-      description: reply,
-    });
-  },
-  [Subcommand.List]: function (interaction, wordList) {
-    const result = wordList.wordList();
-
-    return updater.message(
-      result.length > 0
-        ? {
-            description: "Tracking word list",
-            field: toRankingList(result),
-          }
-        : {
-            description: "Empty list",
-            field: [],
-          }
-    );
-  },
-  [Subcommand.Remove]: (interaction, wordList) => {
-    const word = interaction.options.getString("word")?.trim().toLowerCase();
-    const reply = wordList.remove(word!)
-      ? `Removed the word ${word} from the tracking list.`
-      : `Failed to remove the word`;
-
-    return updater.message({
-      description: reply,
-    });
-  },
-  [Subcommand.Ranking]: function (interaction, wordList): BaseMessageOptions {
-    const word = interaction.options.getString("word")?.trim().toLowerCase();
-    const user = interaction.options.getUser("user");
-
-    const result = wordList.ranking(word, user?.id);
-    return updater.message(
-      result.length > 0
-        ? {
-            description: "Ranking",
-            field: toRankingList(result),
-          }
-        : {
-            description: "Empty list",
-            field: [],
-          }
-    );
-  },
-};
-
-/**
- * The main executioner of this command.
- * @param interaction The interaction object.
- */
-async function execute(interaction: InteractionType) {
-  await interaction.deferReply();
-
-  const wordList = Database.get(interaction.guildId!)?.bannedWord;
-  let message = updater.message({
-    description: "Your guild is not supported this function.",
-  });
-  if (wordList) {
-    const subcommand = interaction.options.getSubcommand() as Subcommand;
-    message = await executor[subcommand](interaction, wordList);
+  get wordList() {
+    return NgrokSubcommandController.wordList;
   }
 
-  await interaction.editReply(message);
+  set wordList(list: BannedWordList | undefined) {
+    NgrokSubcommandController.wordList = list;
+  }
+
+  get result() {
+    return NgrokSubcommandController.result;
+  }
+
+  set result(result: Ranking[]) {
+    NgrokSubcommandController.result = result;
+  }
 }
 
-export { commandName as name, data, execute };
+class AddCommand extends NgrokSubcommandController {
+  constructor() {
+    super(SubcommandNames.Add, "Add word to ban");
+  }
+
+  async execute(options: OptionExtraction) {
+    if (this.wordList) {
+      const word = this.wordList.add(options["word"] as string);
+      this.result = this.wordList.wordList();
+      if (word) {
+        return `Added the word ${word} to the tracking list.`;
+      }
+    }
+    return `Failed to add the word`;
+  }
+}
+
+class ListCommand extends NgrokSubcommandController {
+  constructor() {
+    super(SubcommandNames.List, "Show the banned word list");
+  }
+
+  async execute() {
+    if (this.wordList) {
+      this.result = this.wordList.wordList();
+      if (this.result.length > 0) {
+        return "Tracking word list";
+      }
+    }
+    return "Empty list";
+  }
+}
+
+class RankingCommand extends NgrokSubcommandController {
+  constructor() {
+    super(
+      SubcommandNames.Ranking,
+      "Show the local ranking of saying banned words"
+    );
+  }
+
+  async execute(options: OptionExtraction) {
+    if (this.wordList) {
+      this.result = this.wordList.ranking(
+        options["word"]?.toString(),
+        options["user"]?.toString()
+      );
+      if (this.result.length > 0) {
+        return "Ranking";
+      }
+    }
+    return "Empty list";
+  }
+}
+
+class RemoveCommand extends NgrokSubcommandController {
+  constructor() {
+    super(SubcommandNames.Remove, "Remove word from banned list");
+  }
+
+  async execute(options: OptionExtraction) {
+    if (this.wordList) {
+      const word = this.wordList.remove(options["word"] as string);
+      this.result = this.wordList.wordList();
+      if (word) {
+        return `Removed the word ${word} from the tracking list.`;
+      }
+    }
+    return `Failed to remove the word`;
+  }
+}
+
+const subcommands: DiscordSubcommandOption<SubcommandNames> = {
+  [SubcommandNames.Add]: () => [
+    new SlashCommandStringOption()
+      .setName("word")
+      .setDescription("The word to track")
+      .setRequired(true),
+  ],
+  [SubcommandNames.Ranking]: () => [
+    new SlashCommandUserOption()
+      .setName("user")
+      .setDescription("The user to search"),
+    new SlashCommandStringOption()
+      .setName("word")
+      .setDescription("The word to search"),
+  ],
+  [SubcommandNames.Remove]: () => [
+    new SlashCommandStringOption()
+      .setName("word")
+      .setDescription("The word to delete")
+      .setRequired(true),
+  ],
+};
+
+class WordRankingController extends SubcommandExecutor<
+  SubcommandNames,
+  NgrokSubcommandController
+> {
+  readonly subcommands = {
+    add: new AddCommand(),
+    list: new ListCommand(),
+    remove: new RemoveCommand(),
+    ranking: new RankingCommand(),
+  };
+
+  constructor() {
+    super("word-ranking", "Tracking and ranking words");
+  }
+}
+
+class DiscordWordRankingController extends DiscordSubcommandController<
+  SubcommandNames,
+  NgrokSubcommandController
+> {
+  readonly options: DiscordSubcommandOption<SubcommandNames> = subcommands;
+  readonly executor = new WordRankingController();
+  readonly updater: Updater = new DefaultUpdater("Word ranking");
+
+  async preExecute(
+    interaction: InteractionType
+  ): Promise<BaseMessageOptions | undefined> {
+    NgrokSubcommandController.wordList = Database.get(
+      interaction.guild?.id
+    )?.bannedWord;
+    NgrokSubcommandController.result = [];
+    return undefined;
+  }
+
+  async createReply(options: OptionExtraction, description: string) {
+    let field: APIEmbedField[] = [];
+    if (
+      options.subcommand == SubcommandNames.List ||
+      options.subcommand == SubcommandNames.Ranking
+    ) {
+      field = NgrokSubcommandController.result?.map(
+        ({ id, word, count }, index) => {
+          return {
+            name: `#${index + 1}. Typed count: ${count}`,
+            value: id ? userMention(id) : word ? word : "",
+          };
+        }
+      );
+    }
+    return this.updater.message({
+      description,
+      field,
+    });
+  }
+}
+
+const discord = new DiscordWordRankingController();
+
+export { discord };

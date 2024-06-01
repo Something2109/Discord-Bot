@@ -1,23 +1,23 @@
 import {
-  SlashCommandSubcommandBuilder,
-  SlashCommandBuilder,
-  ChatInputCommandInteraction,
-  BaseMessageOptions,
   APIEmbedField,
   TextBasedChannel,
+  SlashCommandStringOption,
 } from "discord.js";
 import { DefaultServer, Server, ServerStatus } from "../utils/mc-server/Server";
-import { Updater, DefaultUpdater, MessageAPI } from "../utils/Updater";
+import { DefaultUpdater, Updater } from "../utils/Updater";
 import { Database } from "../utils/database/Database";
 import { WorldList } from "../utils/database/List/WorldList";
+import {
+  CommandExecutor,
+  OptionExtraction,
+  SubcommandExecutor,
+} from "../utils/controller/Executor";
+import {
+  InteractionType,
+  DiscordSubcommandController,
+  DiscordSubcommandOption,
+} from "../utils/controller/Discord";
 
-type InteractionType = ChatInputCommandInteraction;
-
-const updater: Updater = new DefaultUpdater("Minecraft Server");
-const server: Server = new DefaultServer(updater);
-let worldData: WorldList | undefined = undefined;
-
-const commandName = "mc-server";
 enum Subcommand {
   Start = "start",
   Stop = "stop",
@@ -25,193 +25,220 @@ enum Subcommand {
   List = "list",
 }
 
-const description: { [key in Subcommand]: string } = {
-  [Subcommand.Start]: "Start the minecraft server",
-  [Subcommand.Stop]: "Stop the minecraft server",
-  [Subcommand.Status]: "Show the status of the minecraft server",
-  [Subcommand.List]: "List the players are playing in the server",
-};
+abstract class ServerSubcommand extends CommandExecutor {
+  static server: Server;
 
-const reply: { [key in Subcommand]: { [key in ServerStatus]: string } } = {
-  [Subcommand.Start]: {
-    [ServerStatus.Online]: "Server has already started",
-    [ServerStatus.Offline]: "Failed to start server",
-    [ServerStatus.Starting]: "Server is starting",
-  },
-  [Subcommand.Stop]: {
-    [ServerStatus.Online]: "Failed to stop server",
-    [ServerStatus.Offline]: "Server has already stopped",
-    [ServerStatus.Starting]: "Server is stopping",
-  },
-  [Subcommand.Status]: {
-    [ServerStatus.Online]: "Server is running",
-    [ServerStatus.Offline]: "Server is not running",
-    [ServerStatus.Starting]: "Server is starting or stopping",
-  },
-  [Subcommand.List]: {
-    [ServerStatus.Online]: "List of player",
-    [ServerStatus.Offline]: "Server is not running",
-    [ServerStatus.Starting]: "Server is starting or stopping",
-  },
-};
-
-function data(guildId: string) {
-  const command = new SlashCommandBuilder()
-    .setName("mc-server")
-    .setDescription("Minecraft server command")
-    .addSubcommand((subcommand: SlashCommandSubcommandBuilder) => {
-      subcommand = subcommand
-        .setName(Subcommand.Start)
-        .setDescription(description[Subcommand.Start]);
-      const guildWorldList = Database.get(guildId)?.world;
-      if (guildWorldList) {
-        subcommand.addStringOption((option) =>
-          option
-            .setName("world")
-            .setDescription("The world to load")
-            .setChoices(...guildWorldList.worldList)
-        );
-      }
-      return subcommand;
-    });
-
-  command.addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
-    subcommand
-      .setName(Subcommand.Stop)
-      .setDescription(description[Subcommand.Stop])
-  );
-
-  command.addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
-    subcommand
-      .setName(Subcommand.Status)
-      .setDescription(description[Subcommand.Status])
-  );
-
-  command.addSubcommand((subcommand: SlashCommandSubcommandBuilder) =>
-    subcommand
-      .setName(Subcommand.List)
-      .setDescription(description[Subcommand.List])
-  );
-
-  return command;
+  get server() {
+    return ServerSubcommand.server;
+  }
 }
 
-/**
- * Get the reply to a specific command.
- * @param subcommand The subcommand of the interaction.
- * @param status Current status of the server.
- * @param host The host of the server.
- * @returns The reply string.
- */
-function getReply(
-  subcommand: Subcommand,
-  status: ServerStatus,
-  host?: string
-): BaseMessageOptions {
-  const currentWorld = worldData?.get(server.world);
-  const field: APIEmbedField[] = [
-    {
-      name: "World:",
-      value: currentWorld?.name ?? "No world is available now",
-    },
-  ];
-
-  if (status !== ServerStatus.Offline) {
-    field.push({
-      name: "Host:",
-      value: host ?? "Ngrok is not running or being used by other application.",
-    });
+class StartCommand extends ServerSubcommand {
+  constructor() {
+    super(Subcommand.Start, "Start the minecraft server");
   }
 
-  return updater.message({
-    description: reply[subcommand][status],
-    field,
-  });
-}
+  async execute(option: OptionExtraction) {
+    let status = await this.server.status();
+    if (status === ServerStatus.Offline) {
+      if (!option.world) return "No valid world is available run";
 
-/**
- * Check if this server is idle or running in current guild.
- * @returns True if can else false
- */
-async function isIdle() {
-  const status = await server.status();
-
-  return !(status !== ServerStatus.Offline && !worldData?.get(server.world));
-}
-
-const executor: {
-  [key in Subcommand]: (
-    interaction: InteractionType,
-    subcommand: Subcommand
-  ) => Promise<BaseMessageOptions>;
-} = {
-  [Subcommand.Start]: async (interaction, subcommand) => {
-    const world = interaction.options.getString("world");
-
-    if (worldData) {
-      let worldFolder =
-        worldData.get(world)?.value ??
-        worldData.get(server.world)?.value ??
-        worldData.worldList[0]?.value;
-      if (!worldFolder) {
-        return updater.message({
-          description: "No valid world is available run",
-        });
-      }
-
-      server.world = worldFolder;
-      const [status, host] = await Promise.all([server.start(), server.host()]);
-      return getReply(subcommand, status, host);
+      this.server.world = option.world.toString();
+      status = await this.server.start();
     }
 
-    return updater.message({
-      description: "Current guild is not supported this function.",
-    });
+    switch (status) {
+      case ServerStatus.Online:
+        return "Server has already started";
+      case ServerStatus.Offline:
+        return "Failed to start server";
+      case ServerStatus.Starting:
+        return "Server is starting";
+    }
+  }
+}
+
+class StopCommand extends ServerSubcommand {
+  constructor() {
+    super(Subcommand.Stop, "Stop the minecraft server");
+  }
+
+  async execute(option: OptionExtraction) {
+    let status = await this.server.stop();
+    switch (status) {
+      case ServerStatus.Online:
+        return "Failed to stop server";
+      case ServerStatus.Offline:
+        return "Server has already stopped";
+      case ServerStatus.Starting:
+        return "Server is stopping";
+    }
+  }
+}
+
+class StatusCommand extends ServerSubcommand {
+  constructor() {
+    super(Subcommand.Status, "Show the status of the minecraft server");
+  }
+
+  async execute(option: OptionExtraction) {
+    const status = await this.server.status();
+    switch (status) {
+      case ServerStatus.Online:
+        return "Server is running";
+      case ServerStatus.Offline:
+        return "Server is not running";
+      case ServerStatus.Starting:
+        return "Server is starting or stopping";
+    }
+  }
+}
+
+class ListCommand extends ServerSubcommand {
+  constructor() {
+    super(Subcommand.List, "List the players are playing in the server");
+  }
+
+  async execute(option: OptionExtraction) {
+    const status = await this.server.status();
+    switch (status) {
+      case ServerStatus.Online:
+        return this.server.playerList.length > 0
+          ? "List of player"
+          : "No player currently in the server";
+      case ServerStatus.Offline:
+        return "Server is not running";
+      case ServerStatus.Starting:
+        return "Server is starting or stopping";
+    }
+  }
+}
+
+const subcommands: DiscordSubcommandOption<Subcommand> = {
+  [Subcommand.Start]: (guildId: string) => {
+    const options = new SlashCommandStringOption()
+      .setName("world")
+      .setDescription("The world to load");
+    const guildWorldList = Database.get(guildId)?.world;
+    if (guildWorldList) {
+      options.setChoices(...guildWorldList.worldList);
+    }
+    return [options];
   },
-  [Subcommand.Stop]: async (interaction, subcommand) => {
-    let [status, host] = await Promise.all([server.stop(), server.host()]);
-    return getReply(subcommand, status, host);
-  },
-  [Subcommand.Status]: async (interaction, subcommand) => {
-    const [status, host] = await Promise.all([server.status(), server.host()]);
-    return getReply(subcommand, status, host);
-  },
-  [Subcommand.List]: async (interaction, subcommand) => {
-    const status = await server.status();
-    let message: MessageAPI = {
-      description: reply[subcommand][status],
-    };
-    if (server.playerList.length > 0) {
-      message.field = server.playerList.map((player) => {
+};
+
+class ServerController extends SubcommandExecutor<
+  Subcommand,
+  ServerSubcommand
+> {
+  readonly subcommands = {
+    [Subcommand.Start]: new StartCommand(),
+    [Subcommand.Stop]: new StopCommand(),
+    [Subcommand.Status]: new StatusCommand(),
+    [Subcommand.List]: new ListCommand(),
+  };
+
+  constructor(server?: Server) {
+    super("mc-server", "Minecraft server command");
+    ServerSubcommand.server =
+      server ?? new DefaultServer(new DefaultUpdater("Minecraft Server"));
+  }
+}
+
+class DiscordServerController extends DiscordSubcommandController<
+  Subcommand,
+  ServerSubcommand
+> {
+  readonly updater: Updater;
+  readonly options: DiscordSubcommandOption<Subcommand>;
+  readonly executor: ServerController;
+  private worldData?: WorldList;
+
+  constructor() {
+    super();
+    this.options = subcommands;
+    this.updater = new DefaultUpdater("Minecraft Server");
+    const server = new DefaultServer(this.updater);
+    this.executor = new ServerController(server);
+  }
+
+  async preExecute(interaction: InteractionType) {
+    this.worldData = Database.get(interaction.guildId!)?.world;
+
+    const status = await ServerSubcommand.server.status();
+    if (
+      status !== ServerStatus.Offline &&
+      !this.worldData?.get(ServerSubcommand.server.world)
+    ) {
+      return this.updater.message({
+        description: "Server is running in another guild.",
+      });
+    }
+
+    this.updater.channel = interaction.channel as TextBasedChannel;
+    return undefined;
+  }
+
+  async extractOptions(
+    interaction: InteractionType
+  ): Promise<OptionExtraction> {
+    const options = await super.extractOptions(interaction);
+    if (options.subcommand === Subcommand.Start && this.worldData) {
+      options.world =
+        this.worldData.get(options.world?.toString())?.value ??
+        this.worldData.get(ServerSubcommand.server.world)?.value ??
+        this.worldData.worldList[0]?.value;
+    }
+    return options;
+  }
+
+  protected chooseWorld(option?: string | null) {
+    if (this.worldData) {
+      let worldFolder =
+        this.worldData.get(option)?.value ??
+        this.worldData.get(ServerSubcommand.server.world)?.value ??
+        this.worldData.worldList[0]?.value;
+
+      return worldFolder;
+    }
+    return undefined;
+  }
+
+  async createReply(options: OptionExtraction, description: string) {
+    const world = this.worldData?.get(ServerSubcommand.server.world);
+    let field: APIEmbedField[];
+    if (
+      options.subcommand === Subcommand.List &&
+      ServerSubcommand.server.playerList.length > 0
+    ) {
+      field = ServerSubcommand.server.playerList.map((player) => {
         return {
           name: player.name,
           value: `Time joined: ${player.time.toLocaleString()}`,
         };
       });
+    } else {
+      field = [
+        {
+          name: "World:",
+          value: world?.name ?? "No world is available now",
+        },
+        {
+          name: "Host:",
+          value:
+            (await ServerSubcommand.server.host()) ??
+            "Ngrok is not running or being used by other application.",
+        },
+      ];
     }
-    return updater.message(message);
-  },
-};
 
-async function execute(interaction: InteractionType) {
-  await interaction.deferReply();
-  worldData = Database.get(interaction.guildId!)?.world;
-
-  const idle = await isIdle();
-  let message: BaseMessageOptions;
-
-  if (idle) {
-    updater.channel = interaction.channel as TextBasedChannel;
-
-    const subcommand = interaction.options.getSubcommand() as Subcommand;
-    message = await executor[subcommand](interaction, subcommand);
-  } else {
-    message = updater.message({
-      description: "Server is running in another guild.",
+    return this.updater.message({
+      description,
+      field,
     });
   }
-
-  await interaction.editReply(message);
 }
 
-export { commandName as name, data, execute };
+const discord = new DiscordServerController();
+
+export { discord };

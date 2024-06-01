@@ -1,112 +1,143 @@
-import {
-  BaseMessageOptions,
-  ChatInputCommandInteraction,
-  SlashCommandBuilder,
-} from "discord.js";
+import { SlashCommandStringOption } from "discord.js";
 import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
 import { DefaultUpdater, Updater } from "../utils/Updater";
+import {
+  OptionExtraction,
+  CommandExecutor,
+  SubcommandExecutor,
+} from "../utils/controller/Executor";
+import {
+  DiscordSubcommandController,
+  DiscordSubcommandOption,
+} from "../utils/controller/Discord";
 
-type InteractionType = ChatInputCommandInteraction;
-
-const updater: Updater = new DefaultUpdater("Ngrok");
-
-const commandName = "ngrok";
 enum Subcommand {
   Start = "start",
   Status = "status",
   Stop = "stop",
 }
 
-const description: { [key in Subcommand]: string } = {
-  [Subcommand.Start]: "Start a tunnel with the specific address.",
-  [Subcommand.Status]: "Show the current tunnel with address.",
-  [Subcommand.Stop]: "Stop the tunnel.",
-};
+abstract class NgrokSubcommand extends CommandExecutor {
+  static tunnelResult: NgrokTunnel | undefined;
 
-const data = (guildId: string) =>
-  new SlashCommandBuilder()
-    .setName(commandName)
-    .setDescription("Ngrok tunnel controller")
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName(Subcommand.Start)
-        .setDescription(description[Subcommand.Start])
-        .addStringOption((option) =>
-          option
-            .setName("addr")
-            .setDescription("The address of the port")
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName(Subcommand.Stop)
-        .setDescription(description[Subcommand.Stop])
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName(Subcommand.Status)
-        .setDescription(description[Subcommand.Status])
-    );
-
-function getReply(
-  tunnel: NgrokTunnel | undefined,
-  onExist: string,
-  onEmpty: string
-): BaseMessageOptions {
-  if (tunnel) {
-    return updater.message({
-      description: onExist,
-      field: [
-        {
-          name: tunnel.public_url,
-          value: tunnel.config.addr,
-        },
-      ],
-    });
+  get tunnelResult() {
+    return NgrokSubcommand.tunnelResult;
   }
 
-  return updater.message({ description: onEmpty });
+  set tunnelResult(tunnel: NgrokTunnel | undefined) {
+    NgrokSubcommand.tunnelResult = tunnel;
+  }
 }
 
-const executor: {
-  [key in Subcommand]: (
-    interaction: InteractionType
-  ) => Promise<BaseMessageOptions>;
-} = {
-  [Subcommand.Start]: async (interaction) => {
-    const address = interaction.options.getString("addr");
-    const tunnel = address ? await Ngrok.start(address) : undefined;
+class StartCommand extends NgrokSubcommand {
+  constructor() {
+    super(Subcommand.Start, "Start a tunnel with the specific address");
+  }
 
-    return tunnel && tunnel.config.addr === address
-      ? getReply(tunnel, "Start tunnel successfully.", "Cannot start tunnel.")
-      : updater.message({
-          description: tunnel
-            ? "Another program is using tunnel right now"
-            : "Cannot start tunnel.",
-        });
-  },
-  [Subcommand.Status]: async (interaction) => {
-    const tunnel = await Ngrok.status();
-    return getReply(tunnel, "Tunnel:", "There's no tunnel running");
-  },
-  [Subcommand.Stop]: async (interaction) => {
-    const tunnel = await Ngrok.stop();
-    return getReply(
-      tunnel,
-      "Cannot stop tunnel.",
-      "Tunnel stops successfully."
-    );
-  },
+  async execute(options: OptionExtraction) {
+    const address = options["addr"] as string;
+    this.tunnelResult = address ? await Ngrok.start(address) : undefined;
+
+    if (this.tunnelResult) {
+      if (this.tunnelResult.config.addr === address) {
+        return "Start tunnel successfully.";
+      }
+      return "Another program is using tunnel right now";
+    }
+    return "Cannot start tunnel.";
+  }
+}
+
+class StatusCommand extends NgrokSubcommand {
+  constructor() {
+    super(Subcommand.Status, "Show the current tunnel with address.");
+  }
+
+  async execute() {
+    this.tunnelResult = await Ngrok.status();
+    if (this.tunnelResult) {
+      return "Tunnel:";
+    }
+    return "There's no tunnel running";
+  }
+}
+
+class StopCommand extends NgrokSubcommand {
+  constructor() {
+    super(Subcommand.Stop, "Stop the tunnel");
+  }
+
+  async execute() {
+    this.tunnelResult = await Ngrok.stop();
+    if (this.tunnelResult) {
+      return "Tunnel stops successfully.";
+    }
+    return "Cannot stop tunnel.";
+  }
+}
+
+const subcommands: DiscordSubcommandOption<Subcommand> = {
+  [Subcommand.Start]: () => [
+    new SlashCommandStringOption()
+      .setName("addr")
+      .setDescription("The address of the port")
+      .setRequired(true),
+  ],
 };
 
-async function execute(interaction: InteractionType) {
-  await interaction.deferReply();
+class NgrokController extends SubcommandExecutor<Subcommand, NgrokSubcommand> {
+  readonly subcommands = {
+    start: new StartCommand(),
+    status: new StatusCommand(),
+    stop: new StopCommand(),
+  };
 
-  const subcommand = interaction.options.getSubcommand() as Subcommand;
+  constructor() {
+    super("ngrok", "Ngrok tunnel controller");
+  }
 
-  const reply = await executor[subcommand](interaction);
-  await interaction.editReply(reply);
+  async [Subcommand.Status]() {
+    NgrokSubcommand.tunnelResult = await Ngrok.status();
+    if (NgrokSubcommand.tunnelResult) {
+      return "Tunnel:";
+    }
+    return "There's no tunnel running";
+  }
+
+  async [Subcommand.Stop]() {
+    NgrokSubcommand.tunnelResult = await Ngrok.stop();
+    if (NgrokSubcommand.tunnelResult) {
+      return "Tunnel stops successfully.";
+    }
+    return "Cannot stop tunnel.";
+  }
 }
 
-export { commandName as name, data, execute };
+class DiscordNgrokController extends DiscordSubcommandController<
+  Subcommand,
+  NgrokSubcommand
+> {
+  readonly options: DiscordSubcommandOption<Subcommand> = subcommands;
+  readonly updater: Updater = new DefaultUpdater("Ngrok");
+  readonly executor: NgrokController = new NgrokController();
+
+  async getDiscordReply(options: OptionExtraction, description: string) {
+    const field = NgrokSubcommand.tunnelResult
+      ? [
+          {
+            name: NgrokSubcommand.tunnelResult.public_url,
+            value: NgrokSubcommand.tunnelResult.config.addr,
+          },
+        ]
+      : [];
+    NgrokSubcommand.tunnelResult = undefined;
+    return this.updater.message({
+      description: description,
+      field,
+    });
+  }
+}
+
+const discord = new DiscordNgrokController();
+
+export { discord };

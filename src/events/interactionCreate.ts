@@ -4,26 +4,25 @@ import { CustomClient } from "../utils/Client";
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction: BaseInteraction) {
-    let commandName = undefined;
-
     if (interaction.isChatInputCommand()) {
-      commandName = interaction.commandName;
-    } else if (interaction.isButton()) {
-      [commandName] = interaction.customId.split(" ");
-    }
+      const commandName = interaction.commandName;
 
-    const client = interaction.client as CustomClient;
-    client.logger.log(`Executing ${commandName}`);
-    let command = client.getCommand(commandName);
+      const client = interaction.client as CustomClient;
+      const user = interaction.user.displayName;
+      const guild = interaction.guild?.name ?? "direct message";
 
-    try {
-      await command?.execute(interaction);
-    } catch (error) {
-      client.logger.error(`Error executing ${commandName}`);
-      if (interaction.isChatInputCommand() || interaction.isButton()) {
+      const command = client.getCommand(commandName);
+      client.logger.log(
+        `Executing ${command?.name} sent by ${user} in ${guild}.`
+      );
+
+      try {
+        await command?.execute(interaction);
+      } catch (error) {
+        client.logger.error(`Error executing ${commandName}`);
         interaction.editReply(`Error executing ${commandName}`);
+        console.error(error);
       }
-      console.error(error);
     }
   },
 };

@@ -1,23 +1,11 @@
-import {
-  Client,
-  Collection,
-  Routes,
-  REST,
-  ClientOptions,
-  SlashCommandBuilder,
-} from "discord.js";
+import { Client, Collection, Routes, REST, ClientOptions } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 import { Database } from "./database/Database";
 import { Logger } from "./Logger";
 import { Connection, DefaultConnection } from "./music/Connection";
+import { DiscordController } from "./controller/Discord";
 const rootPath = path.dirname(path.dirname(__filename));
-
-interface CommandObject {
-  name: string;
-  data(guildId: string): SlashCommandBuilder;
-  execute(interaction: any): Promise<void>;
-}
 
 /**
  * The class responsible for communicating and executing
@@ -26,7 +14,7 @@ interface CommandObject {
  * and events of the bot.
  */
 class CustomClient extends Client {
-  private commands: Collection<string, CommandObject>;
+  private commands: Collection<string, DiscordController>;
   private readonly clientId: string;
   public readonly logger: Logger;
   public readonly connection: Connection;
@@ -37,7 +25,7 @@ class CustomClient extends Client {
       throw new Error("You must put the client ID to the env file.");
     }
     this.clientId = process.env.CLIENT_ID;
-    this.commands = new Collection<string, CommandObject>();
+    this.commands = new Collection<string, DiscordController>();
     this.connection = new DefaultConnection();
     this.logger = new Logger("BOT");
 
@@ -72,14 +60,16 @@ class CustomClient extends Client {
 
     for (const file of commandFiles) {
       const filePath = path.join(commandsPath, file);
-      const command = require(filePath);
+      const command = require(filePath).discord;
 
       // Set a new item in the Collection with the key as the command name and the value as the exported module
-      "name" in command && "data" in command && "execute" in command
-        ? this.commands.set(command.name, command)
-        : this.logger.log(
-            `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
-          );
+      if (command) {
+        "name" in command && "data" in command && "execute" in command
+          ? this.commands.set(command.name, command)
+          : this.logger.log(
+              `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+            );
+      }
     }
   }
 

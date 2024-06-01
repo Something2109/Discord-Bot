@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 
-module.exports = {
+const discord = {
   name: "ping",
   data: (guildId: string) =>
     new SlashCommandBuilder()
@@ -11,3 +11,5 @@ module.exports = {
     await interaction.editReply("Pong again!");
   },
 };
+
+export { discord };

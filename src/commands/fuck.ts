@@ -16,7 +16,7 @@ const data = (guildId: string) =>
       subcommand.setName("server").setDescription("Fuck the server")
     );
 
-module.exports = {
+const discord = {
   name: "fuck",
   data: data,
   async execute(interaction: ChatInputCommandInteraction) {
@@ -30,3 +30,5 @@ module.exports = {
     }
   },
 };
+
+export { discord };

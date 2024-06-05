@@ -72,9 +72,6 @@ class ServerConfig {
     if (!directory) {
       throw new Error("Undefined directory.");
     }
-    if (directory.endsWith(".jar")) {
-      directory = path.dirname(directory);
-    }
 
     if (!filename) {
       filename = directory.endsWith(".jar")
@@ -82,6 +79,10 @@ class ServerConfig {
         : "server.jar";
     } else if (!filename.endsWith(".jar")) {
       throw new Error(`Invalid server jar file ${filename}.`);
+    }
+
+    if (directory.endsWith(".jar")) {
+      directory = path.dirname(directory);
     }
 
     if (!fs.existsSync(path.join(directory, filename))) {

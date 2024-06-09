@@ -4,7 +4,7 @@ import {
   SlashCommandStringOption,
 } from "discord.js";
 import { DefaultServer, Server, ServerStatus } from "../utils/mc-server/Server";
-import { DefaultUpdater, Updater } from "../utils/Updater";
+import { Updater } from "../utils/Updater";
 import { Database } from "../utils/database/Database";
 import { WorldList } from "../utils/database/List/WorldList";
 import {
@@ -63,7 +63,7 @@ class StopCommand extends ServerSubcommand {
     super(Subcommand.Stop, "Stop the minecraft server");
   }
 
-  async execute(option: OptionExtraction) {
+  async execute() {
     let status = await this.server.stop();
     switch (status) {
       case ServerStatus.Online:
@@ -114,7 +114,7 @@ class ListCommand extends ServerSubcommand {
   }
 }
 
-const subcommands: DiscordSubcommandOption<Subcommand> = {
+const options: DiscordSubcommandOption = {
   [Subcommand.Start]: (guildId: string) => {
     const options = new SlashCommandStringOption()
       .setName("world")
@@ -127,39 +127,28 @@ const subcommands: DiscordSubcommandOption<Subcommand> = {
   },
 };
 
-class ServerController extends SubcommandExecutor<
-  Subcommand,
-  ServerSubcommand
-> {
-  readonly subcommands = {
-    [Subcommand.Start]: new StartCommand(),
-    [Subcommand.Stop]: new StopCommand(),
-    [Subcommand.Status]: new StatusCommand(),
-    [Subcommand.List]: new ListCommand(),
-  };
-
+class ServerController extends SubcommandExecutor<ServerSubcommand> {
   constructor(server?: Server) {
     super("mc-server", "Minecraft server command");
-    ServerSubcommand.server =
-      server ?? new DefaultServer(new DefaultUpdater("Minecraft Server"));
+    if (!ServerSubcommand.server) {
+      ServerSubcommand.server = server ?? new DefaultServer();
+    }
+
+    this.add(StartCommand, StopCommand, StatusCommand, ListCommand);
+  }
+
+  get server() {
+    return ServerSubcommand.server;
   }
 }
 
-class DiscordServerController extends DiscordSubcommandController<
-  Subcommand,
-  ServerSubcommand
-> {
-  readonly updater: Updater;
-  readonly options: DiscordSubcommandOption<Subcommand>;
-  readonly executor: ServerController;
+class DiscordServerController extends DiscordSubcommandController<ServerSubcommand> {
+  readonly updater: Updater = new Updater("Minecraft Server");
   private worldData?: WorldList;
 
-  constructor() {
-    super();
-    this.options = subcommands;
-    this.updater = new DefaultUpdater("Minecraft Server");
-    const server = new DefaultServer(this.updater);
-    this.executor = new ServerController(server);
+  constructor(executor: ServerController, options?: DiscordSubcommandOption) {
+    super(executor, options);
+    ServerSubcommand.server.updater = this.updater;
   }
 
   async preExecute(interaction: InteractionType) {
@@ -239,6 +228,7 @@ class DiscordServerController extends DiscordSubcommandController<
   }
 }
 
-const discord = new DiscordServerController();
+const executor = new ServerController();
+const discord = new DiscordServerController(executor, options);
 
 export { discord };

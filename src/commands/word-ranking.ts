@@ -6,7 +6,7 @@ import {
   SlashCommandUserOption,
   userMention,
 } from "discord.js";
-import { Updater, DefaultUpdater } from "../utils/Updater";
+import { Updater } from "../utils/Updater";
 import { Database } from "../utils/database/Database";
 import { BannedWordList, Ranking } from "../utils/database/List/WordList";
 import {
@@ -121,7 +121,7 @@ class RemoveCommand extends NgrokSubcommandController {
   }
 }
 
-const subcommands: DiscordSubcommandOption<SubcommandNames> = {
+const options: DiscordSubcommandOption = {
   [SubcommandNames.Add]: () => [
     new SlashCommandStringOption()
       .setName("word")
@@ -144,29 +144,15 @@ const subcommands: DiscordSubcommandOption<SubcommandNames> = {
   ],
 };
 
-class WordRankingController extends SubcommandExecutor<
-  SubcommandNames,
-  NgrokSubcommandController
-> {
-  readonly subcommands = {
-    add: new AddCommand(),
-    list: new ListCommand(),
-    remove: new RemoveCommand(),
-    ranking: new RankingCommand(),
-  };
-
+class WordRankingController extends SubcommandExecutor<NgrokSubcommandController> {
   constructor() {
     super("word-ranking", "Tracking and ranking words");
+    this.add(AddCommand, ListCommand, RemoveCommand, RankingCommand);
   }
 }
 
-class DiscordWordRankingController extends DiscordSubcommandController<
-  SubcommandNames,
-  NgrokSubcommandController
-> {
-  readonly options: DiscordSubcommandOption<SubcommandNames> = subcommands;
-  readonly executor = new WordRankingController();
-  readonly updater: Updater = new DefaultUpdater("Word ranking");
+class DiscordWordRankingController extends DiscordSubcommandController<NgrokSubcommandController> {
+  readonly updater: Updater = new Updater("Word ranking");
 
   async preExecute(
     interaction: InteractionType
@@ -200,6 +186,7 @@ class DiscordWordRankingController extends DiscordSubcommandController<
   }
 }
 
-const discord = new DiscordWordRankingController();
+const executor = new WordRankingController();
+const discord = new DiscordWordRankingController(executor, options);
 
 export { discord };

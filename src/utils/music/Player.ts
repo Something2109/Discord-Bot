@@ -81,6 +81,8 @@ interface Player {
    * @returns The audio info of the current song.
    */
   unloop(): AudioInfo[];
+
+  set updater(updater: Updater);
 }
 
 interface AudioInfo {
@@ -93,11 +95,11 @@ class DefaultPlayer extends AudioPlayer implements Player {
   private looping: boolean;
   private playing?: AudioInfo;
   private queue: Array<AudioInfo>;
-  private updater: Updater;
+  private updateSender?: Updater;
   private logger: Logger;
   private audioDownloader: Youtube;
 
-  constructor(updater: Updater) {
+  constructor() {
     super();
 
     this.on("stateChange", this.onStageChange)
@@ -107,9 +109,12 @@ class DefaultPlayer extends AudioPlayer implements Player {
     this.looping = false;
     this.playing = undefined;
     this.queue = new Array<AudioInfo>();
-    this.updater = updater;
     this.logger = new Logger("PLR");
     this.audioDownloader = new Youtube();
+  }
+
+  set updater(updater: Updater) {
+    this.updateSender = updater;
   }
 
   /**
@@ -129,7 +134,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
    */
   private onError(error: Error) {
     this.logger.error(`Audio Player Error: ${error.message} with resources`);
-    this.updater.send({
+    this.updateSender?.send({
       description: `Error when playing ${this.playing?.title}: ${error.message}`,
     });
   }
@@ -151,7 +156,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
    */
   private onPlaying() {
     const message = `Playing ${this.playing?.title}`;
-    this.updater.send({
+    this.updateSender?.send({
       description: message,
       url: this.playing?.url,
     });

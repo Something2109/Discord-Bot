@@ -58,6 +58,8 @@ interface Server {
    * @returns The server status showing the state of the server.
    */
   stop(): Promise<ServerStatus>;
+
+  set updater(updater: Updater);
 }
 
 /**
@@ -84,14 +86,13 @@ class DefaultServer implements Server {
   private starting: boolean;
   private players: Array<PlayerInfo>;
   private stopTimeout?: NodeJS.Timeout;
-  private updater: Updater;
+  private updateSender?: Updater;
   protected logger: Logger;
 
-  constructor(updater: Updater, config?: ServerConfig) {
+  constructor(config?: ServerConfig) {
     this.process = undefined;
     this.starting = false;
     this.players = new Array();
-    this.updater = updater;
     this.logger = new Logger("MCS");
 
     this.Config = config ?? new ServerConfig();
@@ -140,6 +141,10 @@ class DefaultServer implements Server {
       this.Config.world = name;
       this.logger.log(`Set the server's world to ${name}`);
     }
+  }
+
+  set updater(updater: Updater) {
+    this.updateSender = updater;
   }
 
   isAvailable(world: string) {
@@ -213,7 +218,7 @@ class DefaultServer implements Server {
   private onStarting(rawMessage: string) {
     if (rawMessage.includes("Done")) {
       this.starting = false;
-      this.updater.send({
+      this.updateSender?.send({
         description: "Server starts successfully",
       });
       this.stopTimeoutManager();
@@ -230,7 +235,7 @@ class DefaultServer implements Server {
       .trim();
 
     if (message.includes("joined") || message.includes("left")) {
-      this.updater.send({
+      this.updateSender?.send({
         description: message,
       });
       const playerName = message.split(" ", 1)[0];
@@ -247,7 +252,7 @@ class DefaultServer implements Server {
    * Function executed when the server process is closed.
    */
   private onClose() {
-    this.updater.send({
+    this.updateSender?.send({
       description: "Server stops successfully",
     });
     this.killServer();
@@ -259,7 +264,7 @@ class DefaultServer implements Server {
    */
   private onError(error: any) {
     this.logger.error(error);
-    this.updater.send({ description: "Server encounters error" });
+    this.updateSender?.send({ description: "Server encounters error" });
     this.killServer();
   }
 
@@ -268,12 +273,12 @@ class DefaultServer implements Server {
    */
   private stopTimeoutManager() {
     if (this.players.length == 0 && !this.stopTimeout) {
-      this.updater.send({
+      this.updateSender?.send({
         description: `Server has no player playing, close in ${this.Config.TimeoutTime} minutes`,
       });
 
       this.stopTimeout = setTimeout(() => {
-        this.updater.send({
+        this.updateSender?.send({
           description: "Server is stopping due to no player playing",
         });
         this.stop();

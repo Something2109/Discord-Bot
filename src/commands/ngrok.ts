@@ -1,6 +1,6 @@
 import { SlashCommandStringOption } from "discord.js";
 import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
-import { DefaultUpdater, Updater } from "../utils/Updater";
+import { Updater } from "../utils/Updater";
 import {
   OptionExtraction,
   CommandExecutor,
@@ -76,7 +76,7 @@ class StopCommand extends NgrokSubcommand {
   }
 }
 
-const subcommands: DiscordSubcommandOption<Subcommand> = {
+const options: DiscordSubcommandOption = {
   [Subcommand.Start]: () => [
     new SlashCommandStringOption()
       .setName("addr")
@@ -85,41 +85,15 @@ const subcommands: DiscordSubcommandOption<Subcommand> = {
   ],
 };
 
-class NgrokController extends SubcommandExecutor<Subcommand, NgrokSubcommand> {
-  readonly subcommands = {
-    start: new StartCommand(),
-    status: new StatusCommand(),
-    stop: new StopCommand(),
-  };
-
+class NgrokController extends SubcommandExecutor<NgrokSubcommand> {
   constructor() {
     super("ngrok", "Ngrok tunnel controller");
-  }
-
-  async [Subcommand.Status]() {
-    NgrokSubcommand.tunnelResult = await Ngrok.status();
-    if (NgrokSubcommand.tunnelResult) {
-      return "Tunnel:";
-    }
-    return "There's no tunnel running";
-  }
-
-  async [Subcommand.Stop]() {
-    NgrokSubcommand.tunnelResult = await Ngrok.stop();
-    if (NgrokSubcommand.tunnelResult) {
-      return "Tunnel stops successfully.";
-    }
-    return "Cannot stop tunnel.";
+    this.add(StartCommand, StatusCommand, StopCommand);
   }
 }
 
-class DiscordNgrokController extends DiscordSubcommandController<
-  Subcommand,
-  NgrokSubcommand
-> {
-  readonly options: DiscordSubcommandOption<Subcommand> = subcommands;
-  readonly updater: Updater = new DefaultUpdater("Ngrok");
-  readonly executor: NgrokController = new NgrokController();
+class DiscordNgrokController extends DiscordSubcommandController<NgrokSubcommand> {
+  readonly updater: Updater = new Updater("Ngrok");
 
   async getDiscordReply(options: OptionExtraction, description: string) {
     const field = NgrokSubcommand.tunnelResult
@@ -138,6 +112,7 @@ class DiscordNgrokController extends DiscordSubcommandController<
   }
 }
 
-const discord = new DiscordNgrokController();
+const executor = new NgrokController();
+const discord = new DiscordNgrokController(executor, options);
 
 export { discord };

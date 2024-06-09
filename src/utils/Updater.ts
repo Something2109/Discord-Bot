@@ -4,7 +4,7 @@ import {
   Message,
   TextBasedChannel,
 } from "discord.js";
-import { Logger } from "./Logger";
+import { ConsoleLineInterface } from "./Console";
 
 const MaxFieldNumber = 25;
 interface MessageAPI {
@@ -16,13 +16,24 @@ interface MessageAPI {
 }
 
 /**
- * The Updater interface.
+ * The Updater class.
  * Contains the function declaring message
  * type and sending update to the channel set in it.
- * Implement this to use in other default classes.
  */
-interface Updater {
-  set channel(channel: TextBasedChannel);
+class Updater {
+  private readonly title: string;
+  private textChannel: TextBasedChannel | undefined;
+
+  constructor(title: string) {
+    this.title = title;
+  }
+
+  /**
+   * Set the channel to update the new message to.
+   */
+  set channel(channel: TextBasedChannel) {
+    this.textChannel = channel;
+  }
 
   /**
    * Create the message to send to the discord channel.
@@ -31,35 +42,6 @@ interface Updater {
    * @param showQueue The indicator to show the music queue in the message.
    * @returns The message object to send.
    */
-  message(message: MessageAPI): BaseMessageOptions;
-
-  /**
-   * Send the message to the specified channel.
-   * @param message The message to send.
-   * @returns The message in Discord format.
-   */
-  send(message: MessageAPI): Promise<Message | undefined>;
-}
-
-/**
- * The default class used in other function.
- */
-class DefaultUpdater implements Updater {
-  private readonly title: string;
-  private textChannel: TextBasedChannel | undefined;
-  private static logger: Logger;
-
-  constructor(title: string) {
-    if (!DefaultUpdater.logger) {
-      DefaultUpdater.logger = new Logger("UDR");
-    }
-    this.title = title;
-  }
-
-  set channel(channel: TextBasedChannel) {
-    this.textChannel = channel;
-  }
-
   public message(message: MessageAPI): BaseMessageOptions {
     if (message.field && message.field.length > MaxFieldNumber) {
       const residual = message.field.length - (MaxFieldNumber - 1);
@@ -82,13 +64,18 @@ class DefaultUpdater implements Updater {
     };
   }
 
+  /**
+   * Send the message to the specified channel.
+   * @param message The message to send.
+   * @returns The message in Discord format.
+   */
   async send(message: MessageAPI): Promise<Message | undefined> {
     try {
       return this.textChannel?.send(this.message(message));
     } catch (error) {
-      DefaultUpdater.logger.error(error);
+      ConsoleLineInterface.error(error);
     }
   }
 }
 
-export { Updater, DefaultUpdater, MessageAPI };
+export { Updater, MessageAPI };

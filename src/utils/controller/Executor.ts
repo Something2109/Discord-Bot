@@ -19,13 +19,26 @@ type OptionExtraction = {
   [key in string]?: OptionType;
 };
 
+/**
+ * The executor interface.
+ * Contains the basic info the executor need
+ * to interact with the command container and client.
+ */
 interface Executor {
   readonly name: string;
   readonly description: string;
-  options?: ApplicationCommandOptionBase[];
+
+  /**
+   * The main execution function of the command.
+   * Taking the options from the parameters and execute.
+   * @param options The option object to be taken.
+   */
   execute(options: OptionExtraction): Promise<string>;
 }
 
+/**
+ * A simple class of the executor to implement new executor class.
+ */
 abstract class CommandExecutor implements Executor {
   readonly name: string;
   readonly description: string;
@@ -39,31 +52,43 @@ abstract class CommandExecutor implements Executor {
   abstract execute(options: OptionExtraction): Promise<string>;
 }
 
-abstract class SubcommandExecutor<
-  Subcommand extends string,
-  Controller extends Executor
-> implements Executor
+/**
+ * A simple class of multicommand executor
+ * to implement new subcommand executor class.
+ * Add subcommand to it by using the add function.
+ */
+abstract class SubcommandExecutor<Controller extends Executor>
+  implements Executor
 {
   readonly name: string;
   readonly description: string;
-  abstract readonly subcommands: {
-    [key in Subcommand]: Controller;
+  readonly subcommands: {
+    [key in string]: Controller;
   };
 
   constructor(name: string, description: string) {
     this.name = name;
     this.description = description;
+    this.subcommands = {};
+  }
+
+  /**
+   * The function to add subcommand to the executor.
+   * @param controllers The subcommand executor type to add to the executor.
+   */
+  public add(...controllers: Array<new () => Controller>) {
+    controllers.forEach((controller) => {
+      const instance = new controller();
+      this.subcommands[instance.name] = instance;
+    });
   }
 
   async execute(options: OptionExtraction) {
-    if (options.subcommand) {
-      return Object.keys(this.subcommands).includes(
-        options.subcommand as Subcommand
-      )
-        ? this.subcommands[options.subcommand as Subcommand].execute(options)
-        : "No subcommand matched";
+    const subcommand = options.subcommand as string;
+    if (subcommand && this.subcommands[subcommand]) {
+      return this.subcommands[subcommand].execute(options);
     }
-    return "No subcommand provided";
+    return "No subcommand matched";
   }
 }
 

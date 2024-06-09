@@ -6,7 +6,7 @@ import {
   TextBasedChannel,
   VoiceBasedChannel,
 } from "discord.js";
-import { Updater, DefaultUpdater } from "../utils/Updater";
+import { Updater } from "../utils/Updater";
 import { AudioInfo, DefaultPlayer, Player } from "../utils/music/Player";
 import {
   CommandExecutor,
@@ -126,7 +126,7 @@ class ListCommand extends MusicSubcommand {
   }
 
   async execute() {
-    this.resultAudio = this.player.list;
+    this.resultAudio = [...this.player.list];
     if (this.resultAudio.length > 0) {
       return "List of songs in the queue:";
     }
@@ -201,7 +201,7 @@ class UnloopCommand extends MusicSubcommand {
   }
 }
 
-const subcommands: DiscordSubcommandOption<Subcommand> = {
+const options: DiscordSubcommandOption = {
   [Subcommand.Add]: () => [
     new SlashCommandStringOption()
       .setName("url")
@@ -225,43 +225,35 @@ const subcommands: DiscordSubcommandOption<Subcommand> = {
   ],
 };
 
-class MusicController extends SubcommandExecutor<Subcommand, MusicSubcommand> {
-  readonly subcommands = {
-    add: new AddCommand(),
-    remove: new RemoveCommand(),
-    leave: new LeaveCommand(),
-    skip: new SkipCommand(),
-    stop: new StopCommand(),
-    list: new ListCommand(),
-    clearqueue: new ClearQueueCommand(),
-    pause: new PauseCommand(),
-    unpause: new UnpauseCommand(),
-    loop: new LoopCommand(),
-    unloop: new UnloopCommand(),
-  };
-
-  constructor(player: Player) {
+class MusicController extends SubcommandExecutor<MusicSubcommand> {
+  constructor(player?: Player) {
     super("music", "Play music");
-    MusicSubcommand.player =
-      player ?? new DefaultPlayer(new DefaultUpdater("Music Player"));
-    MusicSubcommand.resultAudio = [];
+    if (!MusicSubcommand.player) {
+      MusicSubcommand.player = player ?? new DefaultPlayer();
+      MusicSubcommand.resultAudio = [];
+    }
+    this.add(
+      AddCommand,
+      RemoveCommand,
+      LeaveCommand,
+      SkipCommand,
+      StopCommand,
+      ListCommand,
+      ClearQueueCommand,
+      PauseCommand,
+      UnpauseCommand,
+      LoopCommand,
+      UnloopCommand
+    );
   }
 }
 
-class DiscordMusicController extends DiscordSubcommandController<
-  Subcommand,
-  MusicSubcommand
-> {
-  readonly options;
-  readonly updater: Updater;
-  readonly executor: MusicController;
+class DiscordMusicController extends DiscordSubcommandController<MusicSubcommand> {
+  readonly updater: Updater = new Updater("Music Player");
 
-  constructor() {
-    super();
-    this.options = subcommands;
-    this.updater = new DefaultUpdater("Music Player");
-    const player = new DefaultPlayer(this.updater);
-    this.executor = new MusicController(player);
+  constructor(executor: MusicController, options: DiscordSubcommandOption) {
+    super(executor, options);
+    MusicSubcommand.player.updater = this.updater;
   }
 
   async preExecute(interaction: InteractionType) {
@@ -301,6 +293,7 @@ class DiscordMusicController extends DiscordSubcommandController<
   }
 }
 
-const discord = new DiscordMusicController();
+const executor = new MusicController();
+const discord = new DiscordMusicController(executor, options);
 
 export { discord };

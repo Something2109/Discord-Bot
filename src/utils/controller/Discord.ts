@@ -14,8 +14,8 @@ type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 
 type DiscordOptionData = (guildId: string) => ApplicationCommandOptionBase[];
 
-type DiscordSubcommandOption<Subcommand extends string> = {
-  [key in Subcommand]?: DiscordOptionData;
+type DiscordSubcommandOption = {
+  [key in string]: DiscordOptionData;
 };
 
 /**
@@ -88,7 +88,7 @@ interface APIDiscordExecuteFlow {
  * A prototype discord controller for the bot.
  * Contains basic information and a simple pipeline for a command to run.
  */
-abstract class DiscordCommandController
+abstract class BaseDiscordController
   implements DiscordController, APIDiscordExecuteFlow
 {
   abstract readonly executor: Executor;
@@ -101,12 +101,6 @@ abstract class DiscordCommandController
     const command = new SlashCommandBuilder()
       .setName(this.executor.name)
       .setDescription(this.executor.description);
-
-    if (this.executor.options) {
-      this.executor.options.forEach((option) => {
-        command.options.push(option);
-      });
-    }
 
     return command;
   }
@@ -192,30 +186,54 @@ abstract class DiscordCommandController
   }
 }
 
+abstract class DiscordCommandController extends BaseDiscordController {
+  readonly executor: Executor;
+  readonly options?: DiscordOptionData;
+
+  constructor(executor: Executor, options?: DiscordOptionData) {
+    super();
+    this.executor = executor;
+    this.options = options;
+  }
+
+  data(guildId: string): SlashCommandBuilder {
+    const builder = super.data(guildId);
+    if (this.options) {
+      builder.options.push(...this.options(guildId));
+    }
+
+    return builder;
+  }
+}
+
 abstract class DiscordSubcommandController<
-  SubcommandName extends string,
   SubcommandController extends Executor
-> extends DiscordCommandController {
-  abstract readonly executor: SubcommandExecutor<
-    SubcommandName,
-    SubcommandController
-  >;
-  abstract readonly options: DiscordSubcommandOption<SubcommandName>;
+> extends BaseDiscordController {
+  readonly executor: SubcommandExecutor<SubcommandController>;
+  readonly options: DiscordSubcommandOption;
+
+  constructor(
+    executor: SubcommandExecutor<SubcommandController>,
+    options?: DiscordSubcommandOption
+  ) {
+    super();
+    this.executor = executor;
+    this.options = options ?? {};
+  }
 
   data(guildId: string): SlashCommandBuilder {
     const builders = super.data(guildId);
-    for (const info in this.executor.subcommands) {
-      const subcommand = this.executor.subcommands[info];
+    Object.values(this.executor.subcommands).forEach((subcommand) => {
       const builder = new SlashCommandSubcommandBuilder()
         .setName(subcommand.name)
         .setDescription(subcommand.description);
-      let commandOption = this.options[info];
+      let commandOption = this.options[subcommand.name];
       if (commandOption) {
         builder.options.push(...commandOption(guildId));
       }
 
       builders.addSubcommand(builder);
-    }
+    });
     return builders;
   }
 }

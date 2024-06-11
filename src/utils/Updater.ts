@@ -76,6 +76,10 @@ class Updater {
       ConsoleLineInterface.error(error);
     }
   }
+
+  static field(name: string, value: string): APIEmbedField {
+    return { name, value };
+  }
 }
 
 export { Updater, MessageAPI };

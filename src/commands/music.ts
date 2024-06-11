@@ -19,10 +19,12 @@ import {
   DiscordSubcommandOption,
 } from "../utils/controller/Discord";
 import { CustomClient } from "../utils/Client";
+import { CliSubcommandController } from "../utils/controller/Console";
 
 enum Subcommand {
   Add = "add",
   Remove = "remove",
+  Join = "join",
   Leave = "leave",
   Skip = "skip",
   Stop = "stop",
@@ -56,12 +58,14 @@ class AddCommand extends MusicSubcommand {
     super(Subcommand.Add, "Add a song to the player queue");
   }
 
-  async execute(options: OptionExtraction) {
-    this.resultAudio = await this.player.add(options["url"] as string);
-    if (this.resultAudio.length === 1) {
-      return "Add a song:";
-    } else if (this.resultAudio.length > 1) {
-      return "Add a list of song:";
+  async execute({ url }: OptionExtraction) {
+    if (url) {
+      this.resultAudio = await this.player.add(url.toString());
+      if (this.resultAudio.length === 1) {
+        return "Add a song:";
+      } else if (this.resultAudio.length > 1) {
+        return "Add a list of song:";
+      }
     }
     return "Invalid link";
   }
@@ -72,14 +76,24 @@ class RemoveCommand extends MusicSubcommand {
     super(Subcommand.Remove, "Remove the specified song from the queue");
   }
 
-  async execute(options: OptionExtraction) {
-    const position = options["position"] as number;
-    const number = options["number"] as number;
-    this.resultAudio = this.player.remove(position, number);
-    if (this.resultAudio) {
-      return "Remove the song:";
+  async execute({ position, number }: OptionExtraction) {
+    if (position) {
+      this.resultAudio = this.player.remove(Number(position), Number(number));
+      if (this.resultAudio) {
+        return "Remove the song:";
+      }
     }
     return "Failed to remove song from the queue";
+  }
+}
+
+class JoinCommand extends MusicSubcommand {
+  constructor() {
+    super(Subcommand.Join, "Force the player to join channel");
+  }
+
+  async execute() {
+    return "Join the voice channel";
   }
 }
 
@@ -99,9 +113,8 @@ class SkipCommand extends MusicSubcommand {
     super(Subcommand.Skip, "Skip to the next songs in the queue");
   }
 
-  async execute(options: OptionExtraction) {
-    const number = options["number"] as number;
-    this.resultAudio = this.player.skip(number);
+  async execute({ number }: OptionExtraction) {
+    this.resultAudio = this.player.skip(Number(number));
     if (this.resultAudio.length > 0) {
       return "Skip the song:";
     }
@@ -201,7 +214,7 @@ class UnloopCommand extends MusicSubcommand {
   }
 }
 
-const options: DiscordSubcommandOption = {
+const discordSubcommand: DiscordSubcommandOption = {
   [Subcommand.Add]: () => [
     new SlashCommandStringOption()
       .setName("url")
@@ -235,6 +248,7 @@ class MusicController extends SubcommandExecutor<MusicSubcommand> {
     this.add(
       AddCommand,
       RemoveCommand,
+      JoinCommand,
       LeaveCommand,
       SkipCommand,
       StopCommand,
@@ -281,10 +295,9 @@ class DiscordMusicController extends DiscordSubcommandController<MusicSubcommand
   }
 
   async createReply(options: OptionExtraction, description: string) {
-    const audioList = MusicSubcommand.resultAudio.map((info, index) => ({
-      name: `${index + 1}. ${info.title}`,
-      value: info.url,
-    }));
+    const audioList = MusicSubcommand.resultAudio.map((info, index) =>
+      Updater.field(`${index + 1}. ${info.title}`, info.url)
+    );
     MusicSubcommand.resultAudio.length = 0;
     return this.updater.message({
       description,
@@ -293,7 +306,43 @@ class DiscordMusicController extends DiscordSubcommandController<MusicSubcommand
   }
 }
 
-const executor = new MusicController();
-const discord = new DiscordMusicController(executor, options);
+const cliOptions = {
+  [Subcommand.Add]: [
+    {
+      name: "url",
+      description: "The Youtube url or the keywords",
+    },
+  ],
+  [Subcommand.Remove]: [
+    {
+      name: "position",
+      description: "The position of the first song in the queue",
+    },
+    {
+      name: "number",
+      description: "The number of the song to remove",
+    },
+  ],
+  [Subcommand.Skip]: [
+    {
+      name: "number",
+      description: "The number of the song to skip",
+    },
+  ],
+};
 
-export { discord };
+class CliMusicController extends CliSubcommandController<MusicSubcommand> {
+  async createReply(options: OptionExtraction, description: string) {
+    const audioList = MusicSubcommand.resultAudio.map(
+      (info, index) => `\n\t${index + 1}. ${info.title}`
+    );
+    MusicSubcommand.resultAudio.length = 0;
+    return description.concat(...audioList);
+  }
+}
+
+const executor = new MusicController();
+const discord = new DiscordMusicController(executor, discordSubcommand);
+const cli = new CliMusicController(executor, cliOptions);
+
+export { discord, cli };

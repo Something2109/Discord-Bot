@@ -42,7 +42,7 @@ interface APIDiscordExecuteFlow {
    * @param interaction The interaction created the execution line.
    * @returns The message if conditions don't meet, else undefined.
    */
-  preExecute(input: OptionExtraction): Promise<string | undefined>;
+  preExecute(): Promise<string | undefined>;
 
   /**
    * Extract the subcommand and related options from the interaction.
@@ -84,16 +84,16 @@ abstract class BaseCliController
   }
 
   async execute(input: string[]) {
-    const options = await this.extractOptions(input);
-    let message: string | undefined = await this.preExecute(options);
+    let message: string | undefined = await this.preExecute();
     if (!message) {
+      const options = await this.extractOptions(input);
       const result = await this.executor.execute(options);
       message = await this.createReply(options, result);
     }
     return message;
   }
 
-  async preExecute(options: OptionExtraction): Promise<string | undefined> {
+  async preExecute(): Promise<string | undefined> {
     return undefined;
   }
 
@@ -144,10 +144,10 @@ abstract class CliSubcommandController<
 
   help(): string {
     const command = `${this.executor.name}: ${this.executor.description}`;
-    Object.values(this.executor.subcommands).forEach((data) => {
-      command.concat(`\t${data.name}: ${data.description}`);
-    });
-    return command;
+    const subcommands = Object.values(this.executor.subcommands).map(
+      (data) => `\n\t${data.name}: ${data.description}`
+    );
+    return command.concat(...subcommands);
   }
 
   async extractOptions([subcommand, ...input]: string[]) {

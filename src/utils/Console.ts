@@ -9,7 +9,7 @@ class ConsoleLineInterface {
     process.stdin,
     process.stdout
   );
-  private static commands = ConsoleLineInterface.initiateCommands();
+  public static commands = ConsoleLineInterface.initiateCommands();
   private static timeout?: NodeJS.Timeout;
 
   /**
@@ -131,6 +131,9 @@ class ConsoleLineInterface {
         : null;
 
       if (executor) {
+        ConsoleLineInterface.log(
+          `Executing ${commandName} sent from the console line interface.`
+        );
         executor.execute(option).then((result: string) => {
           ConsoleLineInterface.log(result, "CLI", commandName == "exit");
         });

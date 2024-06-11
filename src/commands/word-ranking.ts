@@ -54,11 +54,11 @@ class AddCommand extends NgrokSubcommandController {
     super(SubcommandNames.Add, "Add word to ban");
   }
 
-  async execute(options: OptionExtraction) {
-    if (this.wordList) {
-      const word = this.wordList.add(options["word"] as string);
-      this.result = this.wordList.wordList();
-      if (word) {
+  async execute({ word }: OptionExtraction) {
+    if (this.wordList && word) {
+      if (this.wordList.add(word.toString())) {
+        this.result = this.wordList.wordList();
+
         return `Added the word ${word} to the tracking list.`;
       }
     }
@@ -90,12 +90,9 @@ class RankingCommand extends NgrokSubcommandController {
     );
   }
 
-  async execute(options: OptionExtraction) {
-    if (this.wordList) {
-      this.result = this.wordList.ranking(
-        options["word"]?.toString(),
-        options["user"]?.toString()
-      );
+  async execute({ word, user }: OptionExtraction) {
+    if (this.wordList && (word || user)) {
+      this.result = this.wordList.ranking(word as string, user as string);
       if (this.result.length > 0) {
         return "Ranking";
       }
@@ -109,11 +106,11 @@ class RemoveCommand extends NgrokSubcommandController {
     super(SubcommandNames.Remove, "Remove word from banned list");
   }
 
-  async execute(options: OptionExtraction) {
-    if (this.wordList) {
-      const word = this.wordList.remove(options["word"] as string);
-      this.result = this.wordList.wordList();
-      if (word) {
+  async execute({ word }: OptionExtraction) {
+    if (this.wordList && word) {
+      if (this.wordList.remove(word.toString())) {
+        this.result = this.wordList.wordList();
+
         return `Removed the word ${word} from the tracking list.`;
       }
     }
@@ -171,12 +168,11 @@ class DiscordWordRankingController extends DiscordSubcommandController<NgrokSubc
       options.subcommand == SubcommandNames.Ranking
     ) {
       field = NgrokSubcommandController.result?.map(
-        ({ id, word, count }, index) => {
-          return {
-            name: `#${index + 1}. Typed count: ${count}`,
-            value: id ? userMention(id) : word ? word : "",
-          };
-        }
+        ({ id, word, count }, index) =>
+          Updater.field(
+            `#${index + 1}. Typed count: ${count}`,
+            id ? userMention(id) : word ? word : ""
+          )
       );
     }
     return this.updater.message({

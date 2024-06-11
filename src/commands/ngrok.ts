@@ -10,6 +10,7 @@ import {
   DiscordSubcommandController,
   DiscordSubcommandOption,
 } from "../utils/controller/Discord";
+import { CliSubcommandController } from "../utils/controller/Console";
 
 enum Subcommand {
   Start = "start",
@@ -34,15 +35,16 @@ class StartCommand extends NgrokSubcommand {
     super(Subcommand.Start, "Start a tunnel with the specific address");
   }
 
-  async execute(options: OptionExtraction) {
-    const address = options["addr"] as string;
-    this.tunnelResult = address ? await Ngrok.start(address) : undefined;
+  async execute({ addr }: OptionExtraction) {
+    if (addr) {
+      this.tunnelResult = await Ngrok.start(addr.toString());
 
-    if (this.tunnelResult) {
-      if (this.tunnelResult.config.addr === address) {
-        return "Start tunnel successfully.";
+      if (this.tunnelResult) {
+        if (this.tunnelResult.config.addr === addr.toString()) {
+          return "Start tunnel successfully.";
+        }
+        return "Another program is using tunnel right now";
       }
-      return "Another program is using tunnel right now";
     }
     return "Cannot start tunnel.";
   }
@@ -69,14 +71,14 @@ class StopCommand extends NgrokSubcommand {
 
   async execute() {
     this.tunnelResult = await Ngrok.stop();
-    if (this.tunnelResult) {
+    if (!this.tunnelResult) {
       return "Tunnel stops successfully.";
     }
     return "Cannot stop tunnel.";
   }
 }
 
-const options: DiscordSubcommandOption = {
+const discordOptions: DiscordSubcommandOption = {
   [Subcommand.Start]: () => [
     new SlashCommandStringOption()
       .setName("addr")
@@ -95,24 +97,48 @@ class NgrokController extends SubcommandExecutor<NgrokSubcommand> {
 class DiscordNgrokController extends DiscordSubcommandController<NgrokSubcommand> {
   readonly updater: Updater = new Updater("Ngrok");
 
-  async getDiscordReply(options: OptionExtraction, description: string) {
-    const field = NgrokSubcommand.tunnelResult
-      ? [
-          {
-            name: NgrokSubcommand.tunnelResult.public_url,
-            value: NgrokSubcommand.tunnelResult.config.addr,
-          },
-        ]
-      : [];
-    NgrokSubcommand.tunnelResult = undefined;
+  async createReply(options: OptionExtraction, description: string) {
+    const field = [];
+    if (NgrokSubcommand.tunnelResult) {
+      field.push(
+        Updater.field(
+          NgrokSubcommand.tunnelResult.public_url,
+          NgrokSubcommand.tunnelResult.config.addr
+        )
+      );
+      NgrokSubcommand.tunnelResult = undefined;
+    }
     return this.updater.message({
-      description: description,
+      description,
       field,
     });
   }
 }
 
-const executor = new NgrokController();
-const discord = new DiscordNgrokController(executor, options);
+const cliOptions = {
+  [Subcommand.Start]: [
+    {
+      name: "addr",
+      description: "The address of the port",
+    },
+  ],
+};
 
-export { discord };
+class CliNgrokController extends CliSubcommandController<NgrokSubcommand> {
+  async createReply(options: OptionExtraction, description: string) {
+    const field = NgrokSubcommand.tunnelResult
+      ? [
+          `\n\tURL: ${NgrokSubcommand.tunnelResult.public_url}`,
+          `\n\tCurrent route address: ${NgrokSubcommand.tunnelResult.config.addr}`,
+        ]
+      : [];
+    NgrokSubcommand.tunnelResult = undefined;
+    return description.concat(...field);
+  }
+}
+
+const executor = new NgrokController();
+const discord = new DiscordNgrokController(executor, discordOptions);
+const cli = new CliNgrokController(executor, cliOptions);
+
+export { discord, cli };

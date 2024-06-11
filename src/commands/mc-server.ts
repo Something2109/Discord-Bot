@@ -17,6 +17,7 @@ import {
   DiscordSubcommandController,
   DiscordSubcommandOption,
 } from "../utils/controller/Discord";
+import { CliSubcommandController } from "../utils/controller/Console";
 
 enum Subcommand {
   Start = "start",
@@ -38,12 +39,12 @@ class StartCommand extends ServerSubcommand {
     super(Subcommand.Start, "Start the minecraft server");
   }
 
-  async execute(option: OptionExtraction) {
+  async execute({ world }: OptionExtraction) {
     let status = await this.server.status();
     if (status === ServerStatus.Offline) {
-      if (!option.world) return "No valid world is available run";
+      if (!world) return "No valid world is available run";
 
-      this.server.world = option.world.toString();
+      this.server.world = world.toString();
       status = await this.server.start();
     }
 
@@ -81,7 +82,7 @@ class StatusCommand extends ServerSubcommand {
     super(Subcommand.Status, "Show the status of the minecraft server");
   }
 
-  async execute(option: OptionExtraction) {
+  async execute() {
     const status = await this.server.status();
     switch (status) {
       case ServerStatus.Online:
@@ -99,7 +100,7 @@ class ListCommand extends ServerSubcommand {
     super(Subcommand.List, "List the players are playing in the server");
   }
 
-  async execute(option: OptionExtraction) {
+  async execute() {
     const status = await this.server.status();
     switch (status) {
       case ServerStatus.Online:
@@ -114,7 +115,7 @@ class ListCommand extends ServerSubcommand {
   }
 }
 
-const options: DiscordSubcommandOption = {
+const discordOptions: DiscordSubcommandOption = {
   [Subcommand.Start]: (guildId: string) => {
     const options = new SlashCommandStringOption()
       .setName("world")
@@ -181,18 +182,6 @@ class DiscordServerController extends DiscordSubcommandController<ServerSubcomma
     return options;
   }
 
-  protected chooseWorld(option?: string | null) {
-    if (this.worldData) {
-      let worldFolder =
-        this.worldData.get(option)?.value ??
-        this.worldData.get(ServerSubcommand.server.world)?.value ??
-        this.worldData.worldList[0]?.value;
-
-      return worldFolder;
-    }
-    return undefined;
-  }
-
   async createReply(options: OptionExtraction, description: string) {
     const world = this.worldData?.get(ServerSubcommand.server.world);
     let field: APIEmbedField[];
@@ -200,24 +189,19 @@ class DiscordServerController extends DiscordSubcommandController<ServerSubcomma
       options.subcommand === Subcommand.List &&
       ServerSubcommand.server.playerList.length > 0
     ) {
-      field = ServerSubcommand.server.playerList.map((player) => {
-        return {
-          name: player.name,
-          value: `Time joined: ${player.time.toLocaleString()}`,
-        };
-      });
+      field = ServerSubcommand.server.playerList.map((player) =>
+        Updater.field(
+          player.name,
+          `Time joined: ${player.time.toLocaleString()}`
+        )
+      );
     } else {
+      const host =
+        (await ServerSubcommand.server.host()) ??
+        "Ngrok is not running or being used by other application.";
       field = [
-        {
-          name: "World:",
-          value: world?.name ?? "No world is available now",
-        },
-        {
-          name: "Host:",
-          value:
-            (await ServerSubcommand.server.host()) ??
-            "Ngrok is not running or being used by other application.",
-        },
+        Updater.field("World:", world?.name ?? "No world is available now"),
+        Updater.field("Host:", host),
       ];
     }
 
@@ -228,7 +212,62 @@ class DiscordServerController extends DiscordSubcommandController<ServerSubcomma
   }
 }
 
-const executor = new ServerController();
-const discord = new DiscordServerController(executor, options);
+const cliOptions = {
+  [Subcommand.Start]: [
+    {
+      name: "world",
+      description: "The world to load",
+    },
+  ],
+};
 
-export { discord };
+class CliServerController extends CliSubcommandController<ServerSubcommand> {
+  async extractOptions(input: string[]) {
+    const options = await super.extractOptions(input);
+    if (options.subcommand && options.subcommand == Subcommand.Start) {
+      const world = options.world as string;
+      if (world) {
+        options.world = ServerSubcommand.server.isAvailable(world)
+          ? world
+          : undefined;
+      } else {
+        options.world = ServerSubcommand.server.world;
+      }
+    }
+    return options;
+  }
+
+  async createReply(
+    { subcommand }: OptionExtraction,
+    result: string
+  ): Promise<string> {
+    if (
+      subcommand === Subcommand.List &&
+      ServerSubcommand.server.playerList.length > 0
+    ) {
+      const players = ServerSubcommand.server.playerList.map(
+        (player) =>
+          `\n\t${player.name}: Time joined: ${player.time.toLocaleString()}`
+      );
+      result = result.concat(...players);
+    } else {
+      result = result.concat(
+        `\n\tWorld: ${
+          ServerSubcommand.server.world ?? "No world is available now"
+        }`,
+        `\n\tHost: ${
+          (await ServerSubcommand.server.host()) ??
+          "Ngrok is not running or being used by other application."
+        }`
+      );
+    }
+
+    return result;
+  }
+}
+
+const executor = new ServerController();
+const discord = new DiscordServerController(executor, discordOptions);
+const cli = new CliServerController(executor, cliOptions);
+
+export { discord, cli };

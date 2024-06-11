@@ -5,6 +5,7 @@ import { Database } from "./database/Database";
 import { Logger } from "./Logger";
 import { Connection, DefaultConnection } from "./music/Connection";
 import { DiscordController } from "./controller/Discord";
+import { ConsoleLineInterface } from "./Console";
 const rootPath = path.dirname(path.dirname(__filename));
 
 /**
@@ -60,12 +61,21 @@ class CustomClient extends Client {
 
     for (const file of commandFiles) {
       const filePath = path.join(commandsPath, file);
-      const command = require(filePath).discord;
+      const command = require(filePath);
+      const discordCmd = command.discord;
+      const cliCmd = command.cli;
 
       // Set a new item in the Collection with the key as the command name and the value as the exported module
-      if (command) {
-        "name" in command && "data" in command && "execute" in command
-          ? this.commands.set(command.name, command)
+      if (discordCmd) {
+        "name" in discordCmd && "data" in discordCmd && "execute" in discordCmd
+          ? this.commands.set(discordCmd.name, discordCmd)
+          : this.logger.log(
+              `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+            );
+      }
+      if (cliCmd) {
+        "name" in cliCmd && "help" in cliCmd && "execute" in cliCmd
+          ? ConsoleLineInterface.commands.set(cliCmd.name, cliCmd)
           : this.logger.log(
               `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
             );

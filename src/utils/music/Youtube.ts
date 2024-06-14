@@ -1,36 +1,43 @@
 import ytdl from "ytdl-core";
 import { AudioInfo } from "./Player";
 
-interface YoutubeResponse {
+type YoutubeResponse<Content extends YoutubeContentDetails> = {
   kind: string;
   etag: string;
   id: { kind: string; videoId: string };
   snippet: YoutubeSnippet;
-  contentDetails:
-    | YoutubePlaylistContentDetails
-    | YoutubePlaylistItemContentDetails
-    | YoutubeVideoContentDetails;
-}
+  contentDetails: Content;
+};
 
-interface YoutubeSnippet {
+type YoutubeSnippet = {
   publishedAt: string;
   channelId: string;
   title: string;
   description: string;
   channelTitle: string;
-}
+};
 
-interface YoutubePlaylistContentDetails {
+type YoutubePlaylistContentDetails = {
   itemCount: number;
-}
+};
 
-interface YoutubeVideoContentDetails {
+type YoutubeVideoContentDetails = {
   duration: string;
   contentRating: Object;
-}
+};
 
-interface YoutubePlaylistItemContentDetails {
+type YoutubePlaylistItemContentDetails = {
   videoId: string;
+};
+
+type YoutubeContentDetails =
+  | YoutubePlaylistContentDetails
+  | YoutubePlaylistItemContentDetails
+  | YoutubeVideoContentDetails;
+
+enum YoutubeSearchType {
+  Playlist = "playlist",
+  Video = "video",
 }
 
 class Youtube {
@@ -99,19 +106,22 @@ class Youtube {
     if (listId) {
       const videoList = await this.list(listId);
       if (videoList) {
-        for (let video of videoList) {
-          const detail =
-            video.contentDetails as YoutubePlaylistItemContentDetails;
-          const info = await this.validCheck(detail.videoId);
+        const infoList = await Promise.all(
+          videoList.map((video) => {
+            const detail = video.contentDetails;
+            return this.validCheck(detail.videoId);
+          })
+        );
+        infoList.forEach((info) => {
           if (info) {
             result.push(info);
           }
-        }
+        });
       }
     } else if (videoId) {
       const info = await this.validCheck(videoId);
       if (info) {
-        result = result.concat(info);
+        result.push(info);
       }
     }
     return result;
@@ -123,9 +133,12 @@ class Youtube {
    * @returns The info of the audio if valid else undefined.
    */
   private async validCheck(id: string): Promise<AudioInfo | undefined> {
-    const info = await this.info(id);
+    const info = await this.info<YoutubeVideoContentDetails>(
+      id,
+      YoutubeSearchType.Video
+    );
     if (info) {
-      const detail = info!.contentDetails as YoutubeVideoContentDetails;
+      const detail = info!.contentDetails;
       if (Object.keys(detail.contentRating).length == 0) {
         return {
           url: `https://youtu.be/${id}`,
@@ -142,10 +155,10 @@ class Youtube {
    * @param param The search param object.
    * @returns the items if success else undefined.
    */
-  private async RESTGet(
+  private async RESTGet<Content extends YoutubeContentDetails>(
     url: string,
     param: URLSearchParams
-  ): Promise<Array<YoutubeResponse> | undefined> {
+  ): Promise<YoutubeResponse<Content>[] | undefined> {
     const response = await fetch(`${url}?${param}`, {
       method: "GET",
     });
@@ -162,17 +175,19 @@ class Youtube {
    * @param type The type of item searching
    * @returns The array of video info or undefined.
    */
-  private async info(
+  private async info<Content extends YoutubeContentDetails>(
     id: string,
-    type: YoutubeSearchType = YoutubeSearchType.Video
-  ): Promise<YoutubeResponse | undefined> {
+    type: Content extends YoutubeVideoContentDetails
+      ? YoutubeSearchType.Video
+      : YoutubeSearchType.Playlist
+  ): Promise<YoutubeResponse<Content> | undefined> {
     const url = `${this.apiUrl}/${type}s`;
     const param = new URLSearchParams([
       ["key", this.apiKey],
       ["part", "contentDetails,snippet"],
       ["id", id],
     ]);
-    const info = await this.RESTGet(url, param);
+    const info = await this.RESTGet<Content>(url, param);
     return info ? info[0] : undefined;
   }
 
@@ -183,7 +198,7 @@ class Youtube {
    */
   private async search(
     str: string
-  ): Promise<Array<YoutubeResponse> | undefined> {
+  ): Promise<YoutubeResponse<YoutubeContentDetails>[] | undefined> {
     const url = `${this.apiUrl}/search`;
     const param = new URLSearchParams([
       ["key", this.apiKey],
@@ -192,7 +207,7 @@ class Youtube {
       ["videoCategoryId", "10"],
       ["q", str.replace(" ", "-")],
     ]);
-    return await this.RESTGet(url, param);
+    return await this.RESTGet<YoutubeContentDetails>(url, param);
   }
 
   /**
@@ -201,7 +216,9 @@ class Youtube {
    * @param type The type of item searching.
    * @returns The array of video id or undefined.
    */
-  private async list(id: string): Promise<Array<YoutubeResponse> | undefined> {
+  private async list(
+    id: string
+  ): Promise<YoutubeResponse<YoutubePlaylistItemContentDetails>[] | undefined> {
     const url = `${this.apiUrl}/playlistItems`;
     const param = new URLSearchParams([
       ["key", this.apiKey],
@@ -209,19 +226,17 @@ class Youtube {
       ["playlistId", id],
     ]);
 
-    const listInfo = await this.info(id, YoutubeSearchType.Playlist);
+    const listInfo = await this.info<YoutubePlaylistContentDetails>(
+      id,
+      YoutubeSearchType.Playlist
+    );
     if (listInfo) {
-      const num = listInfo.contentDetails as YoutubePlaylistContentDetails;
+      const num = listInfo.contentDetails;
       param.set("maxResults", num.itemCount.toString());
     }
 
-    return await this.RESTGet(url, param);
+    return await this.RESTGet<YoutubePlaylistItemContentDetails>(url, param);
   }
 }
 
-enum YoutubeSearchType {
-  Playlist = "playlist",
-  Video = "video",
-}
-
-export { Youtube, YoutubeSearchType };
+export { Youtube };

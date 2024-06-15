@@ -241,6 +241,7 @@ abstract class DiscordSubcommandController<
 export {
   InteractionType,
   DiscordController,
+  BaseDiscordController,
   DiscordCommandController,
   DiscordSubcommandOption,
   DiscordSubcommandController,

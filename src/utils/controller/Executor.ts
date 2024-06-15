@@ -36,13 +36,9 @@ interface Executor {
   execute(options: OptionExtraction): Promise<string>;
 }
 
-/**
- * A simple class of the executor to implement new executor class.
- */
-abstract class CommandExecutor implements Executor {
+abstract class BaseExecutor implements Executor {
   readonly name: string;
   readonly description: string;
-  options?: ApplicationCommandOptionBase[];
 
   constructor(name: string, description: string) {
     this.name = name;
@@ -53,22 +49,28 @@ abstract class CommandExecutor implements Executor {
 }
 
 /**
+ * A simple class of the executor to implement new executor class.
+ */
+abstract class CommandExecutor extends BaseExecutor {
+  options?: ApplicationCommandOptionBase[];
+
+  abstract execute(options: OptionExtraction): Promise<string>;
+}
+
+/**
  * A simple class of multicommand executor
  * to implement new subcommand executor class.
  * Add subcommand to it by using the add function.
  */
-abstract class SubcommandExecutor<Controller extends Executor>
-  implements Executor
-{
-  readonly name: string;
-  readonly description: string;
+abstract class SubcommandExecutor<
+  Controller extends Executor
+> extends BaseExecutor {
   readonly subcommands: {
     [key in string]: Controller;
   };
 
   constructor(name: string, description: string) {
-    this.name = name;
-    this.description = description;
+    super(name, description);
     this.subcommands = {};
   }
 
@@ -92,4 +94,10 @@ abstract class SubcommandExecutor<Controller extends Executor>
   }
 }
 
-export { OptionExtraction, Executor, CommandExecutor, SubcommandExecutor };
+export {
+  OptionExtraction,
+  Executor,
+  BaseExecutor,
+  CommandExecutor,
+  SubcommandExecutor,
+};

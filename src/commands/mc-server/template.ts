@@ -3,21 +3,26 @@ import {
   TextBasedChannel,
   SlashCommandStringOption,
 } from "discord.js";
-import { DefaultServer, Server, ServerStatus } from "../utils/mc-server/Server";
-import { Updater } from "../utils/Updater";
-import { Database } from "../utils/database/Database";
-import { WorldList } from "../utils/database/List/WorldList";
 import {
+  DefaultServer,
+  Server,
+  ServerStatus,
+} from "../../utils/mc-server/Server";
+import { Updater } from "../../utils/Updater";
+import { Database } from "../../utils/database/Database";
+import { WorldList } from "../../utils/database/List/WorldList";
+import {
+  BaseExecutor,
   CommandExecutor,
   OptionExtraction,
   SubcommandExecutor,
-} from "../utils/controller/Executor";
+} from "../../utils/controller/Executor";
 import {
   InteractionType,
   DiscordSubcommandController,
   DiscordSubcommandOption,
-} from "../utils/controller/Discord";
-import { CliSubcommandController } from "../utils/controller/Console";
+} from "../../utils/controller/Discord";
+import { CliSubcommandController } from "../../utils/controller/Console";
 
 enum Subcommand {
   Start = "start",
@@ -31,87 +36,6 @@ abstract class ServerSubcommand extends CommandExecutor {
 
   get server() {
     return ServerSubcommand.server;
-  }
-}
-
-class StartCommand extends ServerSubcommand {
-  constructor() {
-    super(Subcommand.Start, "Start the minecraft server");
-  }
-
-  async execute({ world }: OptionExtraction) {
-    let status = await this.server.status();
-    if (status === ServerStatus.Offline) {
-      if (!world) return "No valid world is available run";
-
-      this.server.world = world.toString();
-      status = await this.server.start();
-    }
-
-    switch (status) {
-      case ServerStatus.Online:
-        return "Server has already started";
-      case ServerStatus.Offline:
-        return "Failed to start server";
-      case ServerStatus.Starting:
-        return "Server is starting";
-    }
-  }
-}
-
-class StopCommand extends ServerSubcommand {
-  constructor() {
-    super(Subcommand.Stop, "Stop the minecraft server");
-  }
-
-  async execute() {
-    let status = await this.server.stop();
-    switch (status) {
-      case ServerStatus.Online:
-        return "Failed to stop server";
-      case ServerStatus.Offline:
-        return "Server has already stopped";
-      case ServerStatus.Starting:
-        return "Server is stopping";
-    }
-  }
-}
-
-class StatusCommand extends ServerSubcommand {
-  constructor() {
-    super(Subcommand.Status, "Show the status of the minecraft server");
-  }
-
-  async execute() {
-    const status = await this.server.status();
-    switch (status) {
-      case ServerStatus.Online:
-        return "Server is running";
-      case ServerStatus.Offline:
-        return "Server is not running";
-      case ServerStatus.Starting:
-        return "Server is starting or stopping";
-    }
-  }
-}
-
-class ListCommand extends ServerSubcommand {
-  constructor() {
-    super(Subcommand.List, "List the players are playing in the server");
-  }
-
-  async execute() {
-    const status = await this.server.status();
-    switch (status) {
-      case ServerStatus.Online:
-        return this.server.playerList.length > 0
-          ? "List of player"
-          : "No player currently in the server";
-      case ServerStatus.Offline:
-        return "Server is not running";
-      case ServerStatus.Starting:
-        return "Server is starting or stopping";
-    }
   }
 }
 
@@ -134,8 +58,6 @@ class ServerController extends SubcommandExecutor<ServerSubcommand> {
     if (!ServerSubcommand.server) {
       ServerSubcommand.server = server ?? new DefaultServer();
     }
-
-    this.add(StartCommand, StopCommand, StatusCommand, ListCommand);
   }
 
   get server() {
@@ -147,8 +69,8 @@ class DiscordServerController extends DiscordSubcommandController<ServerSubcomma
   readonly updater: Updater = new Updater("Minecraft Server");
   private worldData?: WorldList;
 
-  constructor(executor: ServerController, options?: DiscordSubcommandOption) {
-    super(executor, options);
+  constructor(executor: ServerController) {
+    super(executor, discordOptions);
     ServerSubcommand.server.updater = this.updater;
   }
 
@@ -222,6 +144,10 @@ const cliOptions = {
 };
 
 class CliServerController extends CliSubcommandController<ServerSubcommand> {
+  constructor(executor: ServerController) {
+    super(executor, cliOptions);
+  }
+
   async extractOptions(input: string[]) {
     const options = await super.extractOptions(input);
     if (options.subcommand && options.subcommand == Subcommand.Start) {
@@ -266,8 +192,9 @@ class CliServerController extends CliSubcommandController<ServerSubcommand> {
   }
 }
 
-const executor = new ServerController();
-const discord = new DiscordServerController(executor, discordOptions);
-const cli = new CliServerController(executor, cliOptions);
-
-export { discord, cli };
+export {
+  ServerSubcommand,
+  ServerController,
+  DiscordServerController,
+  CliServerController,
+};

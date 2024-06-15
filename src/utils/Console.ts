@@ -9,7 +9,7 @@ class ConsoleLineInterface {
     process.stdin,
     process.stdout
   );
-  public static commands = ConsoleLineInterface.initiateCommands();
+  public static commands: Collection<string, CliController>;
   private static timeout?: NodeJS.Timeout;
 
   /**
@@ -51,7 +51,9 @@ class ConsoleLineInterface {
 
     const logError = error as Error;
     const time = new Date().toLocaleString();
-    const log = `[${time}][${src}][ERROR]: ${logError.message}.`;
+    const log = `[${time}][${src}][ERROR]: ${
+      logError.stack ? logError.stack : logError.message
+    }.`;
 
     console.log(log);
     Log.push(log, force);
@@ -93,30 +95,6 @@ class ConsoleLineInterface {
   }
 
   /**
-   *
-   * @returns The command collection object.
-   */
-  private static initiateCommands(): Collection<string, CliController> {
-    const commands = new Collection<string, CliController>();
-    commands.set("help", {
-      name: "help",
-      help: () => `help: Show the command list and their functionalities.`,
-      execute: async () => ConsoleLineInterface.help(),
-    });
-    commands.set("exit", {
-      name: "exit",
-      help: () => `exit: Exit the command line and terminate the bot.`,
-      execute: async () => {
-        setTimeout(() => {
-          ConsoleLineInterface.exit();
-        }, 1000);
-        return "Exitting the program";
-      },
-    });
-    return commands;
-  }
-
-  /**
    * The function called when the readline interface has a new input line inserted.
    * The function search the command based on the splitted input string and execute it.
    * @param input The input string from the readline interface.
@@ -150,7 +128,7 @@ class ConsoleLineInterface {
    * Create a list of commands description.
    * @returns The list of commands the cli can execute.
    */
-  private static help() {
+  static help() {
     let result: string = "Available commands:\n";
     result = result.concat(
       ConsoleLineInterface.commands.map((value) => value.help()).join("\n")
@@ -163,7 +141,7 @@ class ConsoleLineInterface {
    * the exit command or the sigint signal from the interface.
    * @returns The string indicate the exit of the program.
    */
-  private static exit() {
+  static exit() {
     ConsoleLineInterface.terminal.close();
     process.exit();
   }

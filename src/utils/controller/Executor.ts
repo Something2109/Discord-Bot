@@ -78,10 +78,9 @@ abstract class SubcommandExecutor<
    * The function to add subcommand to the executor.
    * @param controllers The subcommand executor type to add to the executor.
    */
-  public add(...controllers: Array<new () => Controller>) {
+  public add(...controllers: Controller[]) {
     controllers.forEach((controller) => {
-      const instance = new controller();
-      this.subcommands[instance.name] = instance;
+      this.subcommands[controller.name] = controller;
     });
   }
 

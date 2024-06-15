@@ -1,11 +1,10 @@
-import { Client, Collection, Routes, REST, ClientOptions } from "discord.js";
+import { Client, Routes, REST, ClientOptions } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 import { Database } from "./database/Database";
 import { Logger } from "./Logger";
 import { Connection, DefaultConnection } from "./music/Connection";
-import { DiscordController } from "./controller/Discord";
-import { ConsoleLineInterface } from "./Console";
+import { CommandLoader } from "./controller/Loader";
 const rootPath = path.dirname(path.dirname(__filename));
 
 /**
@@ -15,10 +14,13 @@ const rootPath = path.dirname(path.dirname(__filename));
  * and events of the bot.
  */
 class CustomClient extends Client {
-  private commands: Collection<string, DiscordController>;
   private readonly clientId: string;
   public readonly logger: Logger;
   public readonly connection: Connection;
+
+  get commands() {
+    return CommandLoader.discord;
+  }
 
   constructor(options: ClientOptions) {
     super(options);
@@ -26,7 +28,6 @@ class CustomClient extends Client {
       throw new Error("You must put the client ID to the env file.");
     }
     this.clientId = process.env.CLIENT_ID;
-    this.commands = new Collection<string, DiscordController>();
     this.connection = new DefaultConnection();
     this.logger = new Logger("BOT");
 
@@ -54,33 +55,7 @@ class CustomClient extends Client {
    * located in the commands folder from the root.
    */
   public readCommands() {
-    const commandsPath = path.join(rootPath, "commands");
-    const commandFiles = fs
-      .readdirSync(commandsPath)
-      .filter((file: string) => file.endsWith(".js"));
-
-    for (const file of commandFiles) {
-      const filePath = path.join(commandsPath, file);
-      const command = require(filePath);
-      const discordCmd = command.discord;
-      const cliCmd = command.cli;
-
-      // Set a new item in the Collection with the key as the command name and the value as the exported module
-      if (discordCmd) {
-        "name" in discordCmd && "data" in discordCmd && "execute" in discordCmd
-          ? this.commands.set(discordCmd.name, discordCmd)
-          : this.logger.log(
-              `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
-            );
-      }
-      if (cliCmd) {
-        "name" in cliCmd && "help" in cliCmd && "execute" in cliCmd
-          ? ConsoleLineInterface.commands.set(cliCmd.name, cliCmd)
-          : this.logger.log(
-              `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
-            );
-      }
-    }
+    CommandLoader.discord;
   }
 
   /**

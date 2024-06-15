@@ -1,16 +1,16 @@
 import { SlashCommandStringOption } from "discord.js";
-import { Ngrok, NgrokTunnel } from "../utils/mc-server/Ngrok";
-import { Updater } from "../utils/Updater";
+import { Ngrok, NgrokTunnel } from "../../utils/mc-server/Ngrok";
+import { Updater } from "../../utils/Updater";
 import {
   OptionExtraction,
   CommandExecutor,
   SubcommandExecutor,
-} from "../utils/controller/Executor";
+} from "../../utils/controller/Executor";
 import {
   DiscordSubcommandController,
   DiscordSubcommandOption,
-} from "../utils/controller/Discord";
-import { CliSubcommandController } from "../utils/controller/Console";
+} from "../../utils/controller/Discord";
+import { CliSubcommandController } from "../../utils/controller/Console";
 
 enum Subcommand {
   Start = "start",
@@ -30,54 +30,6 @@ abstract class NgrokSubcommand extends CommandExecutor {
   }
 }
 
-class StartCommand extends NgrokSubcommand {
-  constructor() {
-    super(Subcommand.Start, "Start a tunnel with the specific address");
-  }
-
-  async execute({ addr }: OptionExtraction) {
-    if (addr) {
-      this.tunnelResult = await Ngrok.start(addr.toString());
-
-      if (this.tunnelResult) {
-        if (this.tunnelResult.config.addr === addr.toString()) {
-          return "Start tunnel successfully.";
-        }
-        return "Another program is using tunnel right now";
-      }
-    }
-    return "Cannot start tunnel.";
-  }
-}
-
-class StatusCommand extends NgrokSubcommand {
-  constructor() {
-    super(Subcommand.Status, "Show the current tunnel with address.");
-  }
-
-  async execute() {
-    this.tunnelResult = await Ngrok.status();
-    if (this.tunnelResult) {
-      return "Tunnel:";
-    }
-    return "There's no tunnel running";
-  }
-}
-
-class StopCommand extends NgrokSubcommand {
-  constructor() {
-    super(Subcommand.Stop, "Stop the tunnel");
-  }
-
-  async execute() {
-    this.tunnelResult = await Ngrok.stop();
-    if (!this.tunnelResult) {
-      return "Tunnel stops successfully.";
-    }
-    return "Cannot stop tunnel.";
-  }
-}
-
 const discordOptions: DiscordSubcommandOption = {
   [Subcommand.Start]: () => [
     new SlashCommandStringOption()
@@ -90,12 +42,15 @@ const discordOptions: DiscordSubcommandOption = {
 class NgrokController extends SubcommandExecutor<NgrokSubcommand> {
   constructor() {
     super("ngrok", "Ngrok tunnel controller");
-    this.add(StartCommand, StatusCommand, StopCommand);
   }
 }
 
 class DiscordNgrokController extends DiscordSubcommandController<NgrokSubcommand> {
   readonly updater: Updater = new Updater("Ngrok");
+
+  constructor(executor: NgrokController) {
+    super(executor, discordOptions);
+  }
 
   async createReply(options: OptionExtraction, description: string) {
     const field = [];
@@ -125,6 +80,10 @@ const cliOptions = {
 };
 
 class CliNgrokController extends CliSubcommandController<NgrokSubcommand> {
+  constructor(executor: NgrokController) {
+    super(executor, cliOptions);
+  }
+
   async createReply(options: OptionExtraction, description: string) {
     const field = NgrokSubcommand.tunnelResult
       ? [
@@ -137,8 +96,9 @@ class CliNgrokController extends CliSubcommandController<NgrokSubcommand> {
   }
 }
 
-const executor = new NgrokController();
-const discord = new DiscordNgrokController(executor, discordOptions);
-const cli = new CliNgrokController(executor, cliOptions);
-
-export { discord, cli };
+export {
+  NgrokSubcommand,
+  NgrokController,
+  DiscordNgrokController,
+  CliNgrokController,
+};

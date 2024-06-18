@@ -143,10 +143,15 @@ class ServerConfig {
    * @param address The address of the server.
    * @returns The host of the server.
    */
-  private hostResolver(address = process.env.MC_ADDRESS): ServerHost {
-    const port = this.readProperty("server-port") ?? "25565";
+  private hostResolver(
+    address = process.env.MC_ADDRESS,
+    port = process.env.MC_PORT
+  ): ServerHost {
     if (address) {
-      return new DefaultHost(`${address}:${port}`);
+      if (port) {
+        address = address.concat(":", port);
+      }
+      return new DefaultHost(address);
     }
     return new NgrokHost(port);
   }

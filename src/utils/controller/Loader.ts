@@ -82,16 +82,20 @@ class ControllerLoader {
    * @param file The file path.
    */
   private static readCommandFile(file: string) {
-    Object.values(this.readFile(file)).forEach((object: any) => {
-      const controller = this.create(object);
-      if (controller) {
-        if ("data" in controller && this.isDiscordController(controller)) {
-          this.discordCommands.set(controller.name, controller);
-        } else if ("help" in controller && this.isCliController(controller)) {
-          ConsoleLineInterface.commands.set(controller.name, controller);
+    const module = this.readFile(file);
+
+    if (module) {
+      Object.values(module).forEach((object: any) => {
+        const controller = this.create(object);
+        if (controller) {
+          if ("data" in controller && this.isDiscordController(controller)) {
+            this.discordCommands.set(controller.name, controller);
+          } else if ("help" in controller && this.isCliController(controller)) {
+            ConsoleLineInterface.commands.set(controller.name, controller);
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   /**
@@ -140,17 +144,19 @@ class ControllerLoader {
     filePath: string,
     Executor?: typeof BaseExecutor
   ): Executor[] {
-    const fileObject = this.readFile(filePath);
+    const module = this.readFile(filePath);
     const result: Executor[] = [];
 
-    Object.values(fileObject).forEach((subcommand: any) => {
-      const subexecutor = this.create(subcommand);
-      if (!subexecutor) return;
+    if (module) {
+      Object.values(module).forEach((subcommand: any) => {
+        const subexecutor = this.create(subcommand);
+        if (!subexecutor) return;
 
-      if (this.isExecutor(subexecutor, Executor)) {
-        result.push(subexecutor);
-      }
-    });
+        if (this.isExecutor(subexecutor, Executor)) {
+          result.push(subexecutor);
+        }
+      });
+    }
 
     return result;
   }
@@ -168,17 +174,20 @@ class ControllerLoader {
     let CliController = CliSubcommandController;
 
     const templatePath = path.join(folderPath, "template.js");
-    Object.values(this.readFile(templatePath)).forEach((object: any) => {
-      if (object.prototype instanceof SubcommandExecutor) {
-        Controller = object;
-      } else if (object.prototype instanceof CommandExecutor) {
-        Executor = object;
-      } else if (object.prototype instanceof DiscordSubcommandController) {
-        DiscordController = object;
-      } else if (object.prototype instanceof CliController) {
-        CliController = object;
-      }
-    });
+    const module = this.readFile(templatePath);
+    if (module) {
+      Object.values(module).forEach((object: any) => {
+        if (object.prototype instanceof SubcommandExecutor) {
+          Controller = object;
+        } else if (object.prototype instanceof CommandExecutor) {
+          Executor = object;
+        } else if (object.prototype instanceof DiscordSubcommandController) {
+          DiscordController = object;
+        } else if (object.prototype instanceof CliController) {
+          CliController = object;
+        }
+      });
+    }
 
     return { Executor, Controller, DiscordController, CliController };
   }
@@ -291,9 +300,13 @@ class ControllerLoader {
    * @param filePath The file path.
    * @returns The object from the file path.
    */
-  private static readFile(filePath: string) {
-    this.logger.log(`Read ${filePath}.`);
-    return require(filePath);
+  private static readFile(filePath: string): Object | undefined {
+    if (fs.existsSync(filePath) && filePath.endsWith(".js")) {
+      this.logger.log(`Read ${filePath}.`);
+      return require(filePath);
+    }
+    this.logger.log(`Cannot find the module in ${filePath}`);
+    return undefined;
   }
 }
 

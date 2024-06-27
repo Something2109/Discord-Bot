@@ -55,15 +55,6 @@ class ControllerLoader {
       help: () => `help: Show the command list and their functionalities.`,
       execute: async () => ConsoleLineInterface.help(),
     });
-    commands.set("refresh", {
-      name: "refresh",
-      help: () =>
-        `refresh: Refresh the command list and their functionalities.`,
-      execute: async () => {
-        ControllerLoader.initiate();
-        return "Finish reloading commands";
-      },
-    });
     commands.set("exit", {
       name: "exit",
       help: () => `exit: Exit the command line and terminate the bot.`,

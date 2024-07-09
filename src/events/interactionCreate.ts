@@ -1,5 +1,6 @@
 import { Events, BaseInteraction } from "discord.js";
 import { CustomClient } from "../utils/Client";
+import { CommandLoader } from "../utils/controller/Loader";
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -11,7 +12,7 @@ module.exports = {
       const user = interaction.user.displayName;
       const guild = interaction.guild?.name ?? "direct message";
 
-      const command = client.getCommand(commandName);
+      const command = CommandLoader.discord.get(commandName);
       client.logger.log(
         `Executing ${command?.name} sent by ${user} in ${guild}.`
       );

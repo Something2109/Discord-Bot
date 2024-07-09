@@ -1,10 +1,9 @@
-import { Client, Routes, REST, ClientOptions } from "discord.js";
+import { Client, ClientOptions } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 import { Database } from "./database/Database";
 import { Logger } from "./Logger";
 import { Connection, DefaultConnection } from "./music/Connection";
-import { CommandLoader } from "./controller/Loader";
 const rootPath = path.dirname(path.dirname(__filename));
 
 /**
@@ -14,20 +13,12 @@ const rootPath = path.dirname(path.dirname(__filename));
  * and events of the bot.
  */
 class CustomClient extends Client {
-  private readonly clientId: string;
   public readonly logger: Logger;
   public readonly connection: Connection;
 
-  get commands() {
-    return CommandLoader.discord;
-  }
-
   constructor(options: ClientOptions) {
     super(options);
-    if (!process.env.CLIENT_ID) {
-      throw new Error("You must put the client ID to the env file.");
-    }
-    this.clientId = process.env.CLIENT_ID;
+
     this.connection = new DefaultConnection();
     this.logger = new Logger("BOT");
 
@@ -51,14 +42,6 @@ class CustomClient extends Client {
   }
 
   /**
-   * Load the commands from all the commands declaration files
-   * located in the commands folder from the root.
-   */
-  public readCommands() {
-    CommandLoader.discord;
-  }
-
-  /**
    * Load the event from all the event declaration files
    * located in the events folder from the root.
    */
@@ -75,47 +58,6 @@ class CustomClient extends Client {
         ? this.once(event.name, (...args) => event.execute(...args))
         : this.on(event.name, (...args) => event.execute(...args));
     }
-  }
-
-  /**
-   * Refresh the command for all the guilds.
-   */
-  public refreshCommandsAll() {
-    this.logger.log(
-      `Started refreshing application (/) commands for all guilds`
-    );
-
-    Database.guildList.forEach((guildId) => {
-      this.refreshCommands(guildId);
-    });
-  }
-
-  /**
-   * Refresh commands for a specified server.
-   * @param guildId The guild id to refresh.
-   */
-  public async refreshCommands(guildId: string) {
-    try {
-      const rest = new REST().setToken(process.env.TOKEN!);
-      const route = Routes.applicationGuildCommands(this.clientId, guildId);
-      const body = this.commands.map((command) =>
-        command.data(guildId).toJSON()
-      );
-
-      // The put method is used to fully refresh all commands in the guild with the current set
-      await rest.put(route, { body });
-
-      this.logger.log(
-        `Successfully reloaded application (/) commands to server ${guildId}`
-      );
-    } catch (error) {
-      // And of course, make sure you catch and log any errors!
-      this.logger.error(error);
-    }
-  }
-
-  public getCommand(commandName: string | undefined) {
-    return commandName ? this.commands.get(commandName) : undefined;
   }
 }
 

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Collection } from "discord.js";
+import { Collection, REST, Routes } from "discord.js";
 import {
   BaseCliController,
   CliController,
@@ -18,7 +18,12 @@ import {
 
 class ControllerLoader {
   private static discordCommands: Collection<string, DiscordController>;
+  private static clientId: string;
+
   private static logger = new Logger("CML");
+  private static commandPaths: Set<string> = new Set([
+    path.join(__dirname, "default"),
+  ]);
 
   static get discord() {
     if (!this.discordCommands) {
@@ -27,45 +32,72 @@ class ControllerLoader {
     return this.discordCommands;
   }
 
+  /**
+   * Create a new instance of command list and remove the old one if created.
+   */
   static initiate() {
+    if (!this.clientId) {
+      if (!process.env.CLIENT_ID) {
+        throw new Error("The client id is not specified.");
+      }
+      this.clientId = process.env.CLIENT_ID;
+    }
+
     this.discordCommands = new Collection();
-    ConsoleLineInterface.commands = this.initiateCliCommands();
+    ConsoleLineInterface.commands = new Collection<string, CliController>();
 
     this.logger.log("Initiating commands");
-    const rootPath = path.dirname(path.dirname(path.dirname(__filename)));
-    const commandsPath = path.join(rootPath, "commands");
-    fs.readdirSync(commandsPath).forEach((file: string) => {
+
+    this.commandPaths.forEach((commandPath) => {
+      this.add(commandPath);
+    });
+  }
+
+  /**
+   * Add a command path to the path list.
+   * @param folderPath The path to load.
+   */
+  static use(folderPath: string) {
+    this.commandPaths.add(folderPath);
+  }
+
+  /**
+   * Add the command by reading the folder path.
+   * @param folderPath The folder path of the command.
+   */
+  private static add(folderPath: string) {
+    fs.readdirSync(folderPath).forEach((file: string) => {
       if (file.endsWith(".js")) {
-        this.readCommandFile(path.join(commandsPath, file));
-      } else if (fs.lstatSync(path.join(commandsPath, file)).isDirectory()) {
-        this.readCommandFolder(path.join(commandsPath, file));
+        this.readCommandFile(path.join(folderPath, file));
+      } else if (fs.lstatSync(path.join(folderPath, file)).isDirectory()) {
+        this.readCommandFolder(path.join(folderPath, file));
       }
     });
   }
 
   /**
-   * Create the command collection and load the default commands
-   * for the console line interface.
-   * @returns The command collection object.
+   * Refresh commands for a specified guild.
+   * @param guildId The guild id to refresh.
    */
-  private static initiateCliCommands(): Collection<string, CliController> {
-    const commands = new Collection<string, CliController>();
-    commands.set("help", {
-      name: "help",
-      help: () => `help: Show the command list and their functionalities.`,
-      execute: async () => ConsoleLineInterface.help(),
-    });
-    commands.set("exit", {
-      name: "exit",
-      help: () => `exit: Exit the command line and terminate the bot.`,
-      execute: async () => {
-        setTimeout(() => {
-          ConsoleLineInterface.exit();
-        }, 1000);
-        return "Exitting the program";
-      },
-    });
-    return commands;
+  static async updateCommands(guildId: string) {
+    try {
+      const body = this.discord.map((command) =>
+        command.data(guildId).toJSON()
+      );
+
+      const rest = new REST().setToken(process.env.TOKEN!);
+      const route = Routes.applicationGuildCommands(this.clientId, guildId);
+
+      // The put method is used to fully refresh all commands in the guild with the current set
+      await rest.put(route, { body });
+
+      this.logger.log(
+        `Successfully reloaded application (/) commands to server ${guildId}`
+      );
+    } catch (error) {
+      // And of course, make sure you catch and log any errors!
+      this.logger.error(error);
+    }
   }
 
   /**
@@ -293,7 +325,7 @@ class ControllerLoader {
    */
   private static readFile(filePath: string): Object | undefined {
     if (fs.existsSync(filePath) && filePath.endsWith(".js")) {
-      this.logger.log(`Read ${filePath}.`);
+      this.logger.log(`Including the commands in path ${filePath}.`);
       return require(filePath);
     }
     this.logger.log(`Cannot find the module in ${filePath}`);

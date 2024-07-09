@@ -29,30 +29,15 @@ class GuildData {
     this.cache = {};
   }
 
-  get bannedWord() {
-    return this.getData(BannedWordList, 60);
-  }
-
-  get world() {
-    return this.getData(WorldList);
-  }
-
-  get sentenceList() {
-    return this.getData(WarningSentenceList);
-  }
-
   /**
-   * Check the  cache if contains the data.
+   * Check the cache if contains the data.
    * If has, update the timeout and return the data from there.
    * Else, create a record in the cache and return the data.
    * @param c The class to check.
    * @param cachetime The time (by minute) to keep the file in the cache before delete.
    * @returns
    */
-  private getData<T extends JsonLoader<any>>(
-    c: { new (path: string): T },
-    cachetime: number = 1
-  ): T {
+  get<T extends JsonLoader<any>>(c: { new (path: string): T }): T {
     const key = c.name;
     if (!this.cache[key]) {
       this.cache[key] = {
@@ -62,6 +47,7 @@ class GuildData {
       clearTimeout(this.cache[key].timeout);
     }
 
+    const cachetime = this.cache[key].data.cacheTime;
     this.cache[key].timeout =
       cachetime > 0
         ? setTimeout(() => delete this.cache[key], cachetime * 60000)

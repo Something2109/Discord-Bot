@@ -88,9 +88,9 @@ class DiscordWordRankingController extends DiscordSubcommandController<WordRanki
   async preExecute(
     interaction: InteractionType
   ): Promise<BaseMessageOptions | undefined> {
-    WordRankingSubcommand.wordList = Database.get(
-      interaction.guild?.id
-    )?.bannedWord;
+    WordRankingSubcommand.wordList = Database.get(interaction.guild?.id)?.get(
+      BannedWordList
+    );
     WordRankingSubcommand.result = [];
     return undefined;
   }

@@ -12,30 +12,49 @@ class Database {
   private static list: {
     [guild_id: string]: GuildData;
   };
-  private static readonly path = path.join(".", "database");
+  private static path = path.join(".", "database");
   private static readonly logger = new Logger("DTB");
 
-  /**
-   * Get the info stored in the database of the system.
-   * If not installed then load it from the saved file.
-   * @returns An instance of the database.
-   */
-  private static getInstance() {
-    if (!(Database.list instanceof Object)) {
-      Database.list = {};
-      if (fs.existsSync(Database.path)) {
-        const guildList = fs
-          .readdirSync(Database.path)
-          .filter((name) =>
-            fs.lstatSync(path.join(Database.path, name)).isDirectory()
-          );
-
-        guildList.forEach((guildId) => {
-          Database.list[guildId] = new GuildData(guildId, Database.path);
-        });
-      }
+  static get guilds(): typeof this.list {
+    if (!this.list) {
+      this.initiate();
     }
     return this.list;
+  }
+
+  /**
+   * Load the database with the new instance.
+   * Remove the old one if has.
+   */
+  static initiate() {
+    this.list = this.create();
+  }
+
+  /**
+   * Add a database path to the instance.
+   * @param folderPath The path to load.
+   */
+  static use(folderPath: string) {
+    this.path = folderPath;
+  }
+
+  /**
+   * Create a new instance of guild list and return it.
+   * @returns An instance of the database.
+   */
+  private static create() {
+    const newGuilds: typeof this.list = {};
+    if (!fs.existsSync(this.path)) {
+      fs.mkdirSync(this.path);
+    }
+    const guildList = fs
+      .readdirSync(this.path)
+      .filter((name) => fs.lstatSync(path.join(this.path, name)).isDirectory());
+
+    guildList.forEach((guildId) => {
+      newGuilds[guildId] = new GuildData(guildId, this.path);
+    });
+    return newGuilds;
   }
 
   /**
@@ -44,20 +63,18 @@ class Database {
    * @returns The id if success else undefined.
    */
   static add(guildId: string) {
-    const guildList = this.getInstance();
-    if (guildList[guildId] == undefined) {
-      fs.mkdirSync(path.join(Database.path, guildId));
-      guildList[guildId] = new GuildData(guildId, Database.path);
+    if (this.guilds[guildId] == undefined) {
+      fs.mkdirSync(path.join(this.path, guildId));
+      this.guilds[guildId] = new GuildData(guildId, this.path);
 
-      Database.logger.log(`Added the guild ${guildId} to the database`);
+      this.logger.log(`Added the guild ${guildId} to the database`);
       return guildId;
     }
     return undefined;
   }
 
   static get guildList() {
-    const guildList = this.getInstance();
-    return Object.keys(guildList);
+    return Object.keys(this.guilds);
   }
 
   /**
@@ -66,9 +83,8 @@ class Database {
    * @returns The data of the guild if database contains else undefined.
    */
   static get(guildId?: string) {
-    const guildList = this.getInstance();
-    if (guildId && guildList[guildId] !== undefined) {
-      return guildList[guildId];
+    if (guildId && this.guilds[guildId] !== undefined) {
+      return this.guilds[guildId];
     }
     return undefined;
   }
@@ -79,12 +95,11 @@ class Database {
    * @returns The id if success else undefined.
    */
   static remove(guildId: string) {
-    const guildList = this.getInstance();
-    if (guildList[guildId] !== undefined) {
-      fs.rmSync(path.join(Database.path, guildId));
-      delete guildList[guildId];
+    if (this.guilds[guildId] !== undefined) {
+      fs.rmSync(path.join(this.path, guildId));
+      delete this.guilds[guildId];
 
-      Database.logger.log(`Removed the guild ${guildId} to the database`);
+      this.logger.log(`Removed the guild ${guildId} to the database`);
       return guildId;
     }
     return undefined;

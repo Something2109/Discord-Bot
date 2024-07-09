@@ -44,7 +44,7 @@ const discordOptions: DiscordSubcommandOption = {
     const options = new SlashCommandStringOption()
       .setName("world")
       .setDescription("The world to load");
-    const guildWorldList = Database.get(guildId)?.world;
+    const guildWorldList = Database.get(guildId)?.get(WorldList);
     if (guildWorldList) {
       options.setChoices(...guildWorldList.worldList);
     }
@@ -75,7 +75,7 @@ class DiscordServerController extends DiscordSubcommandController<ServerSubcomma
   }
 
   async preExecute(interaction: InteractionType) {
-    this.worldData = Database.get(interaction.guildId!)?.world;
+    this.worldData = Database.get(interaction.guildId!)?.get(WorldList);
 
     const status = await ServerSubcommand.server.status();
     if (

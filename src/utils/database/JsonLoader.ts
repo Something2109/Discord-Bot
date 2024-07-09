@@ -9,6 +9,7 @@ import { Logger } from "../Logger";
 abstract class JsonLoader<T> {
   protected readonly path: string;
   protected list: T[];
+  public cacheTime: number;
 
   protected static logger: Logger;
   private saveCooldown?: NodeJS.Timeout;
@@ -18,6 +19,7 @@ abstract class JsonLoader<T> {
       JsonLoader.logger = new Logger("LDR");
     }
     this.list = [];
+    this.cacheTime = 1;
     this.path = filePath;
     this.load();
   }

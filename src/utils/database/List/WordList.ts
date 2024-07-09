@@ -18,6 +18,7 @@ type Ranking = {
 class WordList extends JsonLoader<WordRankingList> {
   constructor(filePath: string) {
     super(path.join(filePath, "banned-word.json"));
+    this.cacheTime = 60;
   }
 
   /**

@@ -133,7 +133,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
    * @param error the player error.
    */
   private onError(error: Error) {
-    this.logger.error(`Audio Player Error: ${error.message} with resources`);
+    this.logger.error(error);
     this.updateSender?.send({
       description: `Error when playing ${this.playing?.title}: ${error.message}`,
     });

@@ -1,4 +1,4 @@
-import ytdl from "ytdl-core";
+import ytdl from "@distube/ytdl-core";
 import { AudioInfo } from "./Player";
 
 type YoutubeResponse<Content extends YoutubeContentDetails> = {

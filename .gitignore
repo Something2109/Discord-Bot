@@ -1,5 +1,6 @@
 .env
 .vs
+/mc-server
 /database
 dist
 node_modules

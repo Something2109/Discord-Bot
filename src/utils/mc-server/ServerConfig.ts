@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "fs";
+import { JSDOM } from "jsdom";
 import {
   DefaultServerHost as DefaultHost,
   DefaultNgrokServerHost as NgrokHost,
@@ -14,6 +15,7 @@ interface ServerConfigAPI {}
  */
 class ServerConfig {
   public readonly Directory: string;
+  public readonly JarFilename: string;
   public readonly Arguments: Array<string>;
   public readonly Host: ServerHost;
   public readonly TimeoutTime: number;
@@ -26,9 +28,10 @@ class ServerConfig {
     worldPath?: string,
     address?: string
   ) {
-    [this.Directory, fileName] = this.pathResolver(directory, fileName);
-    this.Arguments = this.argumentResolver(fileName);
+    [this.Directory, this.JarFilename] = this.pathResolver(directory, fileName);
+    this.Arguments = this.argumentResolver(this.JarFilename);
     [this.WorldPath, this.worldName] = this.worldResolver(worldPath);
+    this.writeWorldName(this.worldName);
     this.Host = this.hostResolver(address);
     this.TimeoutTime = this.timeoutResolver();
     this.eulaResolver();
@@ -70,7 +73,10 @@ class ServerConfig {
     filename?: string
   ): string[] {
     if (!directory) {
-      throw new Error("Undefined directory.");
+      directory = path.join(".", "mc-server");
+      if (!fs.existsSync(directory)) {
+        fs.mkdirSync(directory);
+      }
     }
 
     if (!filename) {
@@ -85,9 +91,6 @@ class ServerConfig {
       directory = path.dirname(directory);
     }
 
-    if (!fs.existsSync(path.join(directory, filename))) {
-      throw new Error(`Cannot find server jar file from ${directory}.`);
-    }
     return [directory, filename];
   }
 
@@ -126,13 +129,12 @@ class ServerConfig {
    */
   private worldResolver(directory = process.env.MC_WORLD_DIR) {
     if (!directory || !fs.existsSync(directory)) {
-      directory = path.join(this.Directory, "world");
+      directory = "world";
     }
 
     let name = this.readWorldName();
     if (!name) {
       name = "default";
-      this.writeWorldName(name);
     }
 
     return [directory, name];
@@ -177,6 +179,41 @@ class ServerConfig {
       }
     }
     fs.writeFileSync(eulaPath, "eula=true");
+  }
+
+  /**
+   * Check if the jar file exist in the folder
+   * If not then download it from the official website.
+   */
+  async jarCheck() {
+    const jarPath = path.join(this.Directory, this.JarFilename);
+    if (!fs.existsSync(jarPath)) {
+      const dom = (
+        await JSDOM.fromURL("https://www.minecraft.net/en-us/download/server")
+      ).window.document;
+
+      const link = dom.querySelector<HTMLAnchorElement>(
+        ".minecraft-version a"
+      )?.href;
+
+      if (!link) {
+        throw new Error(
+          "Cannot download the jar file: cannot find the download link"
+        );
+      }
+
+      const response = await fetch(link);
+      if (!response.ok || !response.body) {
+        throw new Error(
+          "Cannot download the jar file: error when download the file"
+        );
+      }
+
+      const file = fs.createWriteStream(jarPath);
+      for await (const chunk of response.body) {
+        file.write(chunk);
+      }
+    }
   }
 
   /**

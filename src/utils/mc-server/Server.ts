@@ -113,6 +113,7 @@ class DefaultServer implements Server {
       if (connection == ServerStatus.Offline) {
         this.starting = true;
 
+        await this.Config.jarCheck();
         this.spawnServer();
 
         connection = ServerStatus.Starting;

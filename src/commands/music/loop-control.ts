@@ -20,10 +20,11 @@ class UnloopCommand extends MusicSubcommand {
   }
 
   async execute() {
-    if (this.player.unpause()) {
-      return "Unpaused the player";
+    this.resultAudio = this.player.unloop();
+    if (this.resultAudio) {
+      return "Unloop the song:";
     }
-    return "Failed to unpause the player";
+    return "Failed to unloop the player";
   }
 }
 

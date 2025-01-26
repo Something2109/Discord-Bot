@@ -59,6 +59,11 @@ interface Server {
    */
   stop(): Promise<ServerStatus>;
 
+  /**
+   * Update the server version to the newest version.
+   */
+  update(): Promise<void>;
+
   set updater(updater: Updater);
 }
 
@@ -178,6 +183,10 @@ class DefaultServer implements Server {
       this.logger.error(error);
     }
     return connection;
+  }
+
+  async update(): Promise<void> {
+    await this.Config.downloadJar();
   }
 
   /**

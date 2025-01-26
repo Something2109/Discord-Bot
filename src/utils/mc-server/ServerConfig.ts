@@ -187,32 +187,38 @@ class ServerConfig {
    */
   async jarCheck() {
     const jarPath = path.join(this.Directory, this.JarFilename);
-    if (!fs.existsSync(jarPath)) {
-      const dom = (
-        await JSDOM.fromURL("https://www.minecraft.net/en-us/download/server")
-      ).window.document;
+    if (!fs.existsSync(jarPath)) await this.downloadJar();
+  }
 
-      const link = dom.querySelector<HTMLAnchorElement>(
-        ".minecraft-version a"
-      )?.href;
+  /**
+   * Download the jar file from the official website.
+   */
+  async downloadJar() {
+    const jarPath = path.join(this.Directory, this.JarFilename);
+    const dom = (
+      await JSDOM.fromURL("https://www.minecraft.net/en-us/download/server")
+    ).window.document;
 
-      if (!link) {
-        throw new Error(
-          "Cannot download the jar file: cannot find the download link"
-        );
-      }
+    const link = dom.querySelector<HTMLAnchorElement>(
+      ".minecraft-version a"
+    )?.href;
 
-      const response = await fetch(link);
-      if (!response.ok || !response.body) {
-        throw new Error(
-          "Cannot download the jar file: error when download the file"
-        );
-      }
+    if (!link) {
+      throw new Error(
+        "Cannot download the jar file: cannot find the download link"
+      );
+    }
 
-      const file = fs.createWriteStream(jarPath);
-      for await (const chunk of response.body) {
-        file.write(chunk);
-      }
+    const response = await fetch(link);
+    if (!response.ok || !response.body) {
+      throw new Error(
+        "Cannot download the jar file: error when download the file"
+      );
+    }
+
+    const file = fs.createWriteStream(jarPath, { flags: "w" });
+    for await (const chunk of response.body) {
+      file.write(chunk);
     }
   }
 

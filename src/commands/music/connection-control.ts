@@ -17,6 +17,7 @@ class LeaveCommand extends MusicSubcommand {
 
   async execute() {
     this.player.stop();
+    this.player.unloop();
     return "Left the voice channel";
   }
 }

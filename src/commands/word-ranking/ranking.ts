@@ -7,11 +7,9 @@ export class RankingCommand extends WordRankingSubcommand {
   }
 
   async execute({ word, user }: OptionExtraction) {
-    if (this.wordList && (word || user)) {
-      this.result = this.wordList.ranking(word as string, user as string);
-      if (this.result.length > 0) {
-        return "Ranking";
-      }
+    this.result = this.wordList!.ranking(word as string, user as string);
+    if (this.result.length > 0) {
+      return "Ranking";
     }
     return "Empty list";
   }

@@ -1,4 +1,5 @@
-import ytdl from "@distube/ytdl-core";
+import ytdl, { Agent } from "@distube/ytdl-core";
+import fs from "fs";
 import { AudioInfo } from "./Player";
 
 type YoutubeResponse<Content extends YoutubeContentDetails> = {
@@ -45,10 +46,17 @@ class Youtube {
   private readonly apiKey;
   private readonly validPath =
     /^(https:\/\/)?youtu\.be\/|((www|music|gaming)\.)?youtube\.com\/(embed|v|shorts|watch|playlist)/;
+  private readonly agent?: Agent;
 
   constructor() {
     if (!process.env.YOUTUBE_API_KEY) {
       throw Error("No key given to access Youtube API");
+    }
+    if (fs.existsSync("youtube.cookie.json")) {
+      const cookies = JSON.parse(
+        fs.readFileSync("youtube.cookie.json", "utf-8")
+      );
+      this.agent = ytdl.createAgent(cookies);
     }
     this.apiKey = process.env.YOUTUBE_API_KEY;
   }
@@ -62,6 +70,7 @@ class Youtube {
     const info = url;
     if (info) {
       return ytdl(url, {
+        agent: this.agent,
         filter: "audioonly",
         highWaterMark: 20 * 60 * 1024 * 1024,
       });

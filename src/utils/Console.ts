@@ -9,7 +9,6 @@ class ConsoleLineInterface {
     process.stdin,
     process.stdout
   );
-  public static commands: Collection<string, CliController>;
   private static timeout?: NodeJS.Timeout;
 
   /**
@@ -89,51 +88,8 @@ class ConsoleLineInterface {
       input,
       output,
     });
-    newInterface.on("line", ConsoleLineInterface.onNewLine);
     newInterface.on("SIGINT", ConsoleLineInterface.exit);
     return newInterface;
-  }
-
-  /**
-   * The function called when the readline interface has a new input line inserted.
-   * The function search the command based on the splitted input string and execute it.
-   * @param input The input string from the readline interface.
-   */
-  private static onNewLine(input: string) {
-    if (input.length > 0) {
-      ConsoleLineInterface.terminal.pause();
-
-      const [commandName, ...option] = input.split(" ");
-      const executor = commandName
-        ? ConsoleLineInterface.commands.get(commandName)
-        : null;
-
-      if (executor) {
-        ConsoleLineInterface.log(
-          `Executing ${commandName} sent from the console line interface.`
-        );
-        executor.execute(option).then((result: string) => {
-          ConsoleLineInterface.log(result, "CLI", commandName == "exit");
-        });
-      } else {
-        ConsoleLineInterface.log(
-          `Cannot find command name from key ${commandName}`
-        );
-      }
-    }
-  }
-
-  /**
-   * The function called when executing the help command.
-   * Create a list of commands description.
-   * @returns The list of commands the cli can execute.
-   */
-  static help() {
-    let result: string = "Available commands:\n";
-    result = result.concat(
-      ConsoleLineInterface.commands.map((value) => value.help()).join("\n")
-    );
-    return result;
   }
 
   /**
@@ -144,6 +100,43 @@ class ConsoleLineInterface {
   static exit() {
     ConsoleLineInterface.terminal.close();
     process.exit();
+  }
+
+  /**
+   * Add command listener to the cli interface.
+   * @param commands The collection of commands to be listened.
+   */
+  static addCommandListener(commands: Collection<string, CliController>) {
+    ConsoleLineInterface.terminal.removeAllListeners("line");
+
+    /**
+     * The function called when the readline interface has a new input line inserted.
+     * The function search the command based on the splitted input string and execute it.
+     * @param input The input string from the readline interface.
+     */
+    function onNewLine(input: string) {
+      if (input.length > 0) {
+        ConsoleLineInterface.terminal.pause();
+
+        const [commandName, ...option] = input.split(" ");
+        const executor = commandName ? commands.get(commandName) : null;
+
+        if (executor) {
+          ConsoleLineInterface.log(
+            `Executing ${commandName} sent from the console line interface.`
+          );
+          executor.execute(option).then((result: string) => {
+            ConsoleLineInterface.log(result, "CLI", commandName == "exit");
+          });
+        } else {
+          ConsoleLineInterface.log(
+            `Cannot find command name from key ${commandName}`
+          );
+        }
+      }
+    }
+
+    ConsoleLineInterface.terminal.on("line", onNewLine);
   }
 }
 

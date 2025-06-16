@@ -9,6 +9,7 @@ import { BaseExecutor, Executor } from "./Executor";
 
 class ControllerLoader {
   private static discordCommands: Collection<string, DiscordController>;
+  private static cliCommands: Collection<string, CliController>;
   private static clientId: string;
 
   private static logger = new Logger("CML");
@@ -23,6 +24,13 @@ class ControllerLoader {
     return this.discordCommands;
   }
 
+  static get cli() {
+    if (!this.cliCommands) {
+      this.initiate();
+    }
+    return this.cliCommands;
+  }
+
   /**
    * Create a new instance of command list and remove the old one if created.
    */
@@ -35,7 +43,9 @@ class ControllerLoader {
     }
 
     this.discordCommands = new Collection();
-    ConsoleLineInterface.commands = new Collection<string, CliController>();
+    this.cliCommands = new Collection();
+
+    ConsoleLineInterface.addCommandListener(this.cliCommands);
 
     this.logger.log("Initiating commands");
 
@@ -67,7 +77,7 @@ class ControllerLoader {
           this.discordCommands.set(command.name, command);
         });
         Cli.forEach((command) => {
-          ConsoleLineInterface.commands.set(command.name, command);
+          this.cliCommands.set(command.name, command);
         });
       } else if (fs.lstatSync(path.join(folderPath, file)).isDirectory()) {
         const { Discord, Cli } = this.readCommandFolder(
@@ -88,7 +98,7 @@ class ControllerLoader {
 
           controller.add(...Cli);
 
-          ConsoleLineInterface.commands.set(name, controller);
+          this.cliCommands.set(name, controller);
         }
       }
     });

@@ -1,8 +1,6 @@
-import { Collection } from "discord.js";
 import readline from "readline";
 import fs from "fs";
 import path from "node:path";
-import { CliController } from "./controller/Console";
 
 class ConsoleLineInterface {
   private static terminal = ConsoleLineInterface.createInterface(
@@ -106,37 +104,10 @@ class ConsoleLineInterface {
    * Add command listener to the cli interface.
    * @param commands The collection of commands to be listened.
    */
-  static addCommandListener(commands: Collection<string, CliController>) {
+  static addCommandListener(executor: (input: string) => void) {
     ConsoleLineInterface.terminal.removeAllListeners("line");
 
-    /**
-     * The function called when the readline interface has a new input line inserted.
-     * The function search the command based on the splitted input string and execute it.
-     * @param input The input string from the readline interface.
-     */
-    function onNewLine(input: string) {
-      if (input.length > 0) {
-        ConsoleLineInterface.terminal.pause();
-
-        const [commandName, ...option] = input.split(" ");
-        const executor = commandName ? commands.get(commandName) : null;
-
-        if (executor) {
-          ConsoleLineInterface.log(
-            `Executing ${commandName} sent from the console line interface.`
-          );
-          executor.execute(option).then((result: string) => {
-            ConsoleLineInterface.log(result, "CLI");
-          });
-        } else {
-          ConsoleLineInterface.log(
-            `Cannot find command name from key ${commandName}`
-          );
-        }
-      }
-    }
-
-    ConsoleLineInterface.terminal.on("line", onNewLine);
+    ConsoleLineInterface.terminal.on("line", executor);
   }
 }
 

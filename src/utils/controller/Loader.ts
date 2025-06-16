@@ -4,7 +4,6 @@ import { Collection, REST, Routes } from "discord.js";
 import { CliController, CliSubcommandController } from "./Console";
 import { DiscordController, DiscordSubcommandController } from "./Discord";
 import { Logger } from "../Logger";
-import { ConsoleLineInterface } from "../Console";
 import { BaseExecutor, Executor } from "./Executor";
 
 class ControllerLoader {
@@ -44,8 +43,6 @@ class ControllerLoader {
 
     this.discordCommands = new Collection();
     this.cliCommands = new Collection();
-
-    ConsoleLineInterface.addCommandListener(this.cliCommands);
 
     this.logger.log("Initiating commands");
 

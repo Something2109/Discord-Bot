@@ -4,7 +4,6 @@ import {
   Message,
   TextBasedChannel,
 } from "discord.js";
-import { ConsoleLineInterface } from "./Console";
 
 const MaxFieldNumber = 25;
 interface MessageAPI {
@@ -70,11 +69,7 @@ class Updater {
    * @returns The message in Discord format.
    */
   async send(message: MessageAPI): Promise<Message | undefined> {
-    try {
-      return this.textChannel?.send(this.message(message));
-    } catch (error) {
-      ConsoleLineInterface.error(error);
-    }
+    return this.textChannel?.send(this.message(message));
   }
 
   static field(name: string, value: string): APIEmbedField {

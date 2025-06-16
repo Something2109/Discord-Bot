@@ -1,10 +1,15 @@
-import { userMention } from "discord.js";
+import {
+  SlashCommandStringOption,
+  SlashCommandUserOption,
+  userMention,
+} from "discord.js";
 import { Updater } from "../../utils/Updater";
 import { Ranking } from "../../utils/database/List/WordList";
 import {
   DiscordWordRankingController,
   WordRankingSubcommand,
 } from "./template";
+import { InteractionType } from "../../utils/controller/Discord";
 
 type Options = {
   word?: string;
@@ -27,6 +32,25 @@ class DiscordController extends DiscordWordRankingController<
 > {
   constructor(executor: RankingCommand) {
     super(executor);
+  }
+
+  options = () => [
+    new SlashCommandUserOption()
+      .setName("user")
+      .setDescription("The user to search"),
+    new SlashCommandStringOption()
+      .setName("word")
+      .setDescription("The word to search"),
+  ];
+
+  async extractOptions(interactions: InteractionType): Promise<Options> {
+    if (interactions.isChatInputCommand()) {
+      return {
+        word: interactions.options.getString("word") ?? undefined,
+        user: interactions.options.getUser("user")?.id,
+      };
+    }
+    return { word: undefined, user: undefined };
   }
 
   async createReply(result: Ranking[]) {

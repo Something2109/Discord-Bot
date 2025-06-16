@@ -182,7 +182,7 @@ class DefaultPlayer extends AudioPlayer implements Player {
 
   public async add(str: string): Promise<AudioInfo[]> {
     try {
-      const NewAudio = await new Youtube().get(str);
+      const NewAudio = await this.audioDownloader.get(str);
       if (NewAudio) {
         this.queue = this.queue.concat(NewAudio);
         if (!this.playing) {

@@ -58,9 +58,9 @@ class DiscordController extends DiscordMusicController<RemoveOptions> {
 
   async createReply(result: string | AudioInfo[]): Promise<BaseMessageOptions> {
     if (typeof result === "string")
-      return this.updater.message({ description: result });
+      return DiscordController.updater.message({ description: result });
 
-    return this.updater.message({
+    return DiscordController.updater.message({
       description: description(result),
       field: this.createAudio(result),
     });

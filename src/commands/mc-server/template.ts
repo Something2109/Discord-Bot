@@ -32,12 +32,12 @@ abstract class ServerSubcommand<
 class DiscordServerController<
   Options extends OptionExtraction | undefined = undefined
 > extends DiscordCommandController<Options, Result> {
-  readonly updater: Updater = new Updater("Minecraft Server");
+  static readonly updater: Updater = new Updater("Minecraft Server");
   protected worldData?: WorldList;
 
   constructor(executor: ServerSubcommand<Options>) {
     super(executor);
-    ServerSubcommand.server.updater = this.updater;
+    ServerSubcommand.server.updater = DiscordServerController.updater;
   }
 
   async preExecute(interaction: InteractionType) {
@@ -48,12 +48,13 @@ class DiscordServerController<
       status !== ServerStatus.Offline &&
       !this.worldData?.get(ServerSubcommand.server.world)
     ) {
-      return this.updater.message({
+      return DiscordServerController.updater.message({
         description: "Server is running in another guild.",
       });
     }
 
-    this.updater.channel = interaction.channel as SendableChannels;
+    DiscordServerController.updater.channel =
+      interaction.channel as SendableChannels;
     return undefined;
   }
 
@@ -67,7 +68,7 @@ class DiscordServerController<
       Updater.field("Host:", host),
     ];
 
-    return this.updater.message({ description, field });
+    return DiscordServerController.updater.message({ description, field });
   }
 }
 

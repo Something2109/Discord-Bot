@@ -36,7 +36,7 @@ class DiscordController extends DiscordServerController {
     const field = ServerSubcommand.server.playerList.map((player) =>
       Updater.field(player.name, `Time joined: ${player.time.toLocaleString()}`)
     );
-    return this.updater.message({ description, field });
+    return DiscordController.updater.message({ description, field });
   }
 }
 

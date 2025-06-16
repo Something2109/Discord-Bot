@@ -55,9 +55,9 @@ class DiscordController extends DiscordMusicController<AddOptions> {
     _: { url: string }
   ): Promise<BaseMessageOptions> {
     if (typeof result === "string")
-      return this.updater.message({ description: result });
+      return DiscordController.updater.message({ description: result });
 
-    return this.updater.message({
+    return DiscordController.updater.message({
       description: description(result),
       field: this.createAudio(result),
     });

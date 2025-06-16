@@ -32,24 +32,25 @@ abstract class MusicSubcommand<
 class DiscordMusicController<
   Options extends OptionExtraction | undefined = undefined
 > extends DiscordCommandController<Options, MusicResult> {
-  readonly updater: Updater = new Updater("Music Player");
+  static readonly updater: Updater = new Updater("Music Player");
 
   constructor(executor: MusicSubcommand<Options>) {
     super(executor);
-    MusicSubcommand.player.updater = this.updater;
+    MusicSubcommand.player.updater = DiscordMusicController.updater;
   }
 
   async preExecute(interaction: InteractionType) {
     if (interaction instanceof ChatInputCommandInteraction) {
       const client = interaction.client as CustomClient;
 
-      this.updater.channel = interaction.channel as SendableChannels;
+      DiscordMusicController.updater.channel =
+        interaction.channel as SendableChannels;
 
       const member = interaction.member as GuildMember;
       const userVoiceChannel = member.voice.channel as VoiceBasedChannel;
       const status = client.connection.connect(userVoiceChannel);
       if (!status) {
-        return this.updater.message({
+        return DiscordMusicController.updater.send({
           description: "You need to join a voice channel to play the music",
         });
       }

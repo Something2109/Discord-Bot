@@ -20,9 +20,7 @@ class Executor extends MusicSubcommand {
 }
 
 class DiscordController extends DiscordMusicController {
-  async preExecute(
-    interaction: InteractionType
-  ): Promise<BaseMessageOptions | undefined> {
+  async preExecute(interaction: InteractionType) {
     if (interaction.isChatInputCommand()) {
       const client = interaction.client as CustomClient;
 

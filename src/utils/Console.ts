@@ -29,14 +29,14 @@ class ConsoleLineInterface {
    * @param src The source of the message.
    * @param force The indicator to force save the message.
    */
-  public static log(message: string, src = "CLI", force = false) {
+  public static log(message: string, src = "CLI") {
     ConsoleLineInterface.pause();
 
     const time = new Date().toLocaleString();
     const log = `[${time}][${src}]: ${message}`;
 
     console.log(log);
-    Log.push(log, force);
+    Log.push(log);
   }
 
   /**
@@ -45,7 +45,7 @@ class ConsoleLineInterface {
    * @param src The source of the error.
    * @param force The indicator to force save the message.
    */
-  public static error(error: unknown, src = "CLI", force = true) {
+  public static error(error: unknown, src = "CLI") {
     ConsoleLineInterface.pause();
 
     const logError = error as Error;
@@ -55,7 +55,7 @@ class ConsoleLineInterface {
     }.`;
 
     console.log(log);
-    Log.push(log, force);
+    Log.push(log);
   }
 
   /**
@@ -126,7 +126,7 @@ class ConsoleLineInterface {
             `Executing ${commandName} sent from the console line interface.`
           );
           executor.execute(option).then((result: string) => {
-            ConsoleLineInterface.log(result, "CLI", commandName == "exit");
+            ConsoleLineInterface.log(result, "CLI");
           });
         } else {
           ConsoleLineInterface.log(
@@ -146,53 +146,28 @@ class ConsoleLineInterface {
  */
 class Log {
   private static date = new Date();
-  private static logList: string[] = [];
-  private static timeout?: NodeJS.Timeout;
+  private static stream = Log.createStream();
+
+  static createStream() {
+    const logDir = path.join(
+      ".",
+      "log",
+      `${Log.date.toLocaleDateString().replaceAll("/", "-")}.txt`
+    );
+
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+
+    return fs.createWriteStream(logDir, { flags: "a" });
+  }
 
   /**
    * Push the line into the save list.
    * @param line The line to save.
    */
-  static push(line: string, force = false) {
-    Log.logList.push(line);
-    force ? Log.forceSave() : Log.save();
-  }
-
-  /**
-   * Function called to save the list to file.
-   * Create a timeout to wait for more new lines to be bunk saved.
-   * If no more new line coming, the new lines will be saved by using force save function.
-   */
-  private static save() {
-    if (Log.timeout) {
-      clearTimeout(Log.timeout);
-    }
-    Log.timeout = setTimeout(() => {
-      Log.forceSave();
-      Log.logList.length = 0;
-      Log.timeout = undefined;
-    }, 5000);
-  }
-
-  /**
-   * Save the log to file immediately.
-   */
-  private static forceSave() {
-    const logDir = path.join(".", "log");
-
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir);
-    }
-
-    if (Log.date.getDay() !== new Date().getDay()) {
-      Log.date = new Date();
-    }
-
-    const logPath = path.join(
-      logDir,
-      `${Log.date.toLocaleDateString().replaceAll("/", "-")}.txt`
-    );
-    fs.appendFileSync(logPath, Log.logList.join("\n"));
+  static push(line: string) {
+    Log.stream.write(line + "\n");
   }
 }
 

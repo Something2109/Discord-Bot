@@ -1,10 +1,10 @@
 require("dotenv").config();
-import { ConsoleClient, CustomClient } from "./utils/Client";
+import path from "node:path";
 import { GatewayIntentBits } from "discord.js";
 import { CommandLoader } from "./utils/controller/Loader";
-import path from "node:path";
 import { Database } from "./utils/database/Database";
-import { ConsoleLineInterface } from "./utils/Console";
+import ConsoleLineInterface from "./utils/logging/Console";
+import { ConsoleClient, CustomClient } from "./utils/Client";
 
 CommandLoader.use(path.join(__dirname, "commands"));
 

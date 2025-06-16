@@ -1,4 +1,4 @@
-import { ConsoleLineInterface } from "../../Console";
+import ConsoleLineInterface from "../../logging/Console";
 
 const console = {
   name: "exit",

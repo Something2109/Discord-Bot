@@ -1,6 +1,4 @@
 import readline from "readline";
-import fs from "fs";
-import path from "node:path";
 
 class ConsoleLineInterface {
   private static terminal = ConsoleLineInterface.createInterface(
@@ -27,14 +25,10 @@ class ConsoleLineInterface {
    * @param src The source of the message.
    * @param force The indicator to force save the message.
    */
-  public static log(message: string, src = "CLI") {
+  public static log(message: string) {
     ConsoleLineInterface.pause();
 
-    const time = new Date().toLocaleString();
-    const log = `[${time}][${src}]: ${message}`;
-
-    console.log(log);
-    Log.push(log);
+    console.log(message);
   }
 
   /**
@@ -43,17 +37,10 @@ class ConsoleLineInterface {
    * @param src The source of the error.
    * @param force The indicator to force save the message.
    */
-  public static error(error: unknown, src = "CLI") {
+  public static error(message: string) {
     ConsoleLineInterface.pause();
 
-    const logError = error as Error;
-    const time = new Date().toLocaleString();
-    const log = `[${time}][${src}][ERROR]: ${
-      logError.stack ? logError.stack : logError.message
-    }.`;
-
-    console.log(log);
-    Log.push(log);
+    console.log(message);
   }
 
   /**
@@ -111,35 +98,4 @@ class ConsoleLineInterface {
   }
 }
 
-/**
- * The class responsible for saving the important information
- * of the bot to the log files.
- */
-class Log {
-  private static date = new Date();
-  private static stream = Log.createStream();
-
-  static createStream() {
-    const logDir = path.join(
-      ".",
-      "log",
-      `${Log.date.toLocaleDateString().replaceAll("/", "-")}.txt`
-    );
-
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
-    }
-
-    return fs.createWriteStream(logDir, { flags: "a" });
-  }
-
-  /**
-   * Push the line into the save list.
-   * @param line The line to save.
-   */
-  static push(line: string) {
-    Log.stream.write(line + "\n");
-  }
-}
-
-export { ConsoleLineInterface };
+export default ConsoleLineInterface;

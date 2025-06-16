@@ -1,4 +1,5 @@
-import { ConsoleLineInterface } from "./Console";
+import ConsoleLineInterface from "./logging/Console";
+import FileLog from "./logging/File";
 
 /**
  * Use to log the server logging text to the CLI and save to file.
@@ -27,7 +28,11 @@ class Logger {
    * @param message The message to save.
    */
   public log(message: string) {
-    ConsoleLineInterface.log(message, this.src);
+    const time = new Date().toLocaleString();
+    const log = `[${time}][${this.src}]: ${message}`;
+
+    ConsoleLineInterface.log(log);
+    FileLog.push(log);
   }
 
   /**
@@ -35,7 +40,14 @@ class Logger {
    * @param error The error to log.
    */
   public error(error: unknown) {
-    ConsoleLineInterface.error(error, this.src);
+    const logError = error as Error;
+    const time = new Date().toLocaleString();
+    const log = `[${time}][${this.src}][ERROR]: ${
+      logError.stack ? logError.stack : logError.message
+    }.`;
+
+    ConsoleLineInterface.error(log);
+    FileLog.push(log);
   }
 }
 

@@ -8,7 +8,7 @@ import {
   ApplicationCommandOptionBase,
   CommandInteractionOption,
 } from "discord.js";
-import { OptionExtraction, Executor, SubcommandExecutor } from "./Executor";
+import { OptionExtraction, Executor } from "./Executor";
 
 type InteractionType = ChatInputCommandInteraction | ButtonInteraction;
 
@@ -43,7 +43,12 @@ interface DiscordController {
   execute: (interaction: InteractionType) => Promise<void>;
 }
 
-interface APIDiscordExecuteFlow {
+interface APIDiscordExecuteFlow<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> {
+  readonly executor: Executor<Options, Result>;
+
   /**
    * The function run before the executor function.
    * Can be used to set up the required conditions to run the main function.
@@ -61,7 +66,7 @@ interface APIDiscordExecuteFlow {
    * @param interaction The interaction to extract.
    * @returns An object contains all the extracted options
    */
-  extractOptions(interaction: InteractionType): Promise<OptionExtraction>;
+  extractOptions(interaction: InteractionType): Promise<Options>;
 
   /**
    * Get the discord reply to the command result.
@@ -70,10 +75,7 @@ interface APIDiscordExecuteFlow {
    * @param result Description of the result.
    * @returns The reply string.
    */
-  createReply(
-    options: OptionExtraction,
-    result: string
-  ): Promise<BaseMessageOptions>;
+  createReply(result: Result, options: Options): Promise<BaseMessageOptions>;
 
   /**
    * The function run after the message has been sent.
@@ -88,10 +90,17 @@ interface APIDiscordExecuteFlow {
  * A prototype discord controller for the bot.
  * Contains basic information and a simple pipeline for a command to run.
  */
-abstract class BaseDiscordController
-  implements DiscordController, APIDiscordExecuteFlow
+abstract class DiscordCommandController<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> implements DiscordController, APIDiscordExecuteFlow<Options, Result>
 {
-  abstract readonly executor: Executor;
+  readonly executor: Executor<Options, Result>;
+  readonly options?: (guildId: string) => ApplicationCommandOptionBase[];
+
+  constructor(executor: Executor<Options, Result>) {
+    this.executor = executor;
+  }
 
   get name() {
     return this.executor.name;
@@ -101,6 +110,8 @@ abstract class BaseDiscordController
     const command = new SlashCommandBuilder()
       .setName(this.executor.name)
       .setDescription(this.executor.description);
+
+    if (this.options) command.options.push(...this.options(guildId));
 
     return command;
   }
@@ -112,7 +123,7 @@ abstract class BaseDiscordController
     if (!message) {
       const options = await this.extractOptions(interaction);
       const result = await this.executor.execute(options);
-      message = await this.createReply(options, result);
+      message = await this.createReply(result, options);
     }
     await interaction.editReply(message);
 
@@ -120,28 +131,19 @@ abstract class BaseDiscordController
   }
 
   async preExecute(
-    interaction: InteractionType
+    _: InteractionType
   ): Promise<BaseMessageOptions | undefined> {
     return undefined;
   }
 
-  async extractOptions(
-    interaction: InteractionType
-  ): Promise<OptionExtraction> {
-    const result: OptionExtraction = {};
-    if (interaction.isChatInputCommand()) {
-      this.extractChatInputOptions(result, interaction.options.data);
-    }
-    return result;
+  async extractOptions(_: InteractionType): Promise<Options> {
+    return undefined as Options;
   }
 
-  async createReply(
-    options: OptionExtraction,
-    result: string
-  ): Promise<BaseMessageOptions> {
-    return {
-      content: result,
-    };
+  async createReply(result: Result, _: Options): Promise<BaseMessageOptions> {
+    if (typeof result === "object") return { content: JSON.stringify(result) };
+
+    return { content: String(result) };
   }
 
   async postExecute(interaction: InteractionType): Promise<void> {
@@ -186,62 +188,62 @@ abstract class BaseDiscordController
   }
 }
 
-abstract class DiscordCommandController extends BaseDiscordController {
-  readonly executor: Executor;
-  readonly options?: DiscordOptionData;
+class DiscordSubcommandController implements DiscordController {
+  readonly name: string;
+  readonly description: string;
+  private readonly executors: { [key in string]: DiscordController };
 
-  constructor(executor: Executor, options?: DiscordOptionData) {
-    super();
-    this.executor = executor;
-    this.options = options;
+  constructor(name: string, description: string) {
+    this.name = name;
+    this.description = description;
+    this.executors = {};
+  }
+
+  add(...controllers: DiscordController[]) {
+    controllers.forEach((controller) => {
+      this.executors[controller.name] = controller;
+    });
   }
 
   data(guildId: string): SlashCommandBuilder {
-    const builder = super.data(guildId);
-    if (this.options) {
-      builder.options.push(...this.options(guildId));
-    }
+    const builders = new SlashCommandBuilder()
+      .setName(this.name)
+      .setDescription(this.description);
 
-    return builder;
-  }
-}
-
-abstract class DiscordSubcommandController<
-  SubcommandController extends Executor
-> extends BaseDiscordController {
-  readonly executor: SubcommandExecutor<SubcommandController>;
-  readonly options: DiscordSubcommandOption;
-
-  constructor(
-    executor: SubcommandExecutor<SubcommandController>,
-    options?: DiscordSubcommandOption
-  ) {
-    super();
-    this.executor = executor;
-    this.options = options ?? {};
-  }
-
-  data(guildId: string): SlashCommandBuilder {
-    const builders = super.data(guildId);
-    Object.values(this.executor.subcommands).forEach((subcommand) => {
+    Object.values(this.executors).forEach((subcommand) => {
+      const command = subcommand.data(guildId);
       const builder = new SlashCommandSubcommandBuilder()
-        .setName(subcommand.name)
-        .setDescription(subcommand.description);
-      let commandOption = this.options[subcommand.name];
-      if (commandOption) {
-        builder.options.push(...commandOption(guildId));
+        .setName(command.name)
+        .setDescription(command.description);
+      if (command.options.length > 0) {
+        builder.options.push(
+          ...(command.options as ApplicationCommandOptionBase[])
+        );
       }
 
       builders.addSubcommand(builder);
     });
     return builders;
   }
+
+  async execute(interaction: InteractionType) {
+    if (interaction.isChatInputCommand()) {
+      const name = interaction.options.getSubcommand();
+
+      if (name && this.executors[name]) {
+        await this.executors[name].execute(interaction);
+
+        return;
+      }
+    }
+
+    await interaction.reply({ content: "No subcommand matched" });
+  }
 }
 
 export {
   InteractionType,
   DiscordController,
-  BaseDiscordController,
   DiscordCommandController,
   DiscordSubcommandOption,
   DiscordSubcommandController,

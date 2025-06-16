@@ -1,20 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Collection, REST, Routes } from "discord.js";
-import {
-  BaseCliController,
-  CliController,
-  CliSubcommandController,
-} from "./Console";
+import { CliController, CliSubcommandController } from "./Console";
 import { DiscordController, DiscordSubcommandController } from "./Discord";
 import { Logger } from "../Logger";
 import { ConsoleLineInterface } from "../Console";
-import {
-  BaseExecutor,
-  CommandExecutor,
-  Executor,
-  SubcommandExecutor,
-} from "./Executor";
+import { BaseExecutor, Executor } from "./Executor";
 
 class ControllerLoader {
   private static discordCommands: Collection<string, DiscordController>;
@@ -68,9 +59,37 @@ class ControllerLoader {
   private static add(folderPath: string) {
     fs.readdirSync(folderPath).forEach((file: string) => {
       if (file.endsWith(".js")) {
-        this.readCommandFile(path.join(folderPath, file));
+        const { Discord, Cli } = this.readCommandFile(
+          path.join(folderPath, file)
+        );
+
+        Discord.forEach((command) => {
+          this.discordCommands.set(command.name, command);
+        });
+        Cli.forEach((command) => {
+          ConsoleLineInterface.commands.set(command.name, command);
+        });
       } else if (fs.lstatSync(path.join(folderPath, file)).isDirectory()) {
-        this.readCommandFolder(path.join(folderPath, file));
+        const { Discord, Cli } = this.readCommandFolder(
+          path.join(folderPath, file)
+        );
+        const name = file.replace(".js", "");
+
+        if (Discord.length > 0) {
+          const controller = new DiscordSubcommandController(name, name);
+
+          controller.add(...Discord);
+
+          this.discordCommands.set(name, controller);
+        }
+
+        if (Cli.length > 0) {
+          const controller = new CliSubcommandController(name, name);
+
+          controller.add(...Cli);
+
+          ConsoleLineInterface.commands.set(name, controller);
+        }
       }
     });
   }
@@ -105,6 +124,11 @@ class ControllerLoader {
    * @param file The file path.
    */
   private static readCommandFile(file: string) {
+    const result: { Discord: DiscordController[]; Cli: CliController[] } = {
+      Discord: [],
+      Cli: [],
+    };
+
     const module = this.readFile(file);
 
     if (module) {
@@ -112,71 +136,10 @@ class ControllerLoader {
         const controller = this.create(object);
         if (controller) {
           if ("data" in controller && this.isDiscordController(controller)) {
-            this.discordCommands.set(controller.name, controller);
+            result.Discord.push(controller);
           } else if ("help" in controller && this.isCliController(controller)) {
-            ConsoleLineInterface.commands.set(controller.name, controller);
+            result.Cli.push(controller);
           }
-        }
-      });
-    }
-  }
-
-  /**
-   * Read and create the command from a folder.
-   * @param folder The folder path.
-   */
-  private static readCommandFolder(folder: string) {
-    const { Executor, Controller, DiscordController, CliController } =
-      this.loadTemplate(folder);
-
-    const controller = this.create(Controller);
-
-    if (controller && controller instanceof SubcommandExecutor) {
-      const discord = this.create(DiscordController, controller);
-      if (this.isDiscordController(discord)) {
-        this.discordCommands.set(discord.name, discord);
-      }
-
-      const cli = this.create(CliController, controller);
-      if (this.isCliController(cli)) {
-        ConsoleLineInterface.commands.set(cli.name, cli);
-      }
-    } else {
-      this.logger.log(
-        `[WARNING] Cannot create subcommand controller from ${controller.name}`
-      );
-    }
-
-    fs.readdirSync(folder)
-      .filter((file) => file.endsWith(".js") && file != "template.js")
-      .forEach((file) => {
-        const subcommandPath = path.join(folder, file);
-        const fileObject = this.readSubcommandFile(subcommandPath, Executor);
-        controller.add(...fileObject);
-      });
-  }
-
-  /**
-   * Read the subcommand file from the path.
-   * Can take the Executor parameter to specify the specific executors to take.
-   * @param filePath The file path to read.
-   * @param Executor The executor type to specify the executors.
-   * @returns The executor array to load.
-   */
-  private static readSubcommandFile(
-    filePath: string,
-    Executor?: typeof BaseExecutor
-  ): Executor[] {
-    const module = this.readFile(filePath);
-    const result: Executor[] = [];
-
-    if (module) {
-      Object.values(module).forEach((subcommand: any) => {
-        const subexecutor = this.create(subcommand);
-        if (!subexecutor) return;
-
-        if (this.isExecutor(subexecutor, Executor)) {
-          result.push(subexecutor);
         }
       });
     }
@@ -185,34 +148,26 @@ class ControllerLoader {
   }
 
   /**
-   * Load the template class from the template file.
-   * If none specified, function will load the default class from the controller.
-   * @param folderPath The subcommand folder path.
-   * @returns The template classes.
+   * Read and create the command from a folder.
+   * @param folder The folder path.
    */
-  private static loadTemplate(folderPath: string) {
-    let Executor: typeof CommandExecutor | undefined = undefined;
-    let Controller = SubcommandExecutor;
-    let DiscordController = DiscordSubcommandController;
-    let CliController = CliSubcommandController;
+  private static readCommandFolder(folder: string) {
+    const result: { Discord: DiscordController[]; Cli: CliController[] } = {
+      Discord: [],
+      Cli: [],
+    };
 
-    const templatePath = path.join(folderPath, "template.js");
-    const module = this.readFile(templatePath);
-    if (module) {
-      Object.values(module).forEach((object: any) => {
-        if (object.prototype instanceof SubcommandExecutor) {
-          Controller = object;
-        } else if (object.prototype instanceof CommandExecutor) {
-          Executor = object;
-        } else if (object.prototype instanceof DiscordSubcommandController) {
-          DiscordController = object;
-        } else if (object.prototype instanceof CliController) {
-          CliController = object;
-        }
+    fs.readdirSync(folder)
+      .filter((file) => file.endsWith(".js") && file != "template.js")
+      .forEach((file) => {
+        const subcommandPath = path.join(folder, file);
+        const { Discord, Cli } = this.readCommandFile(subcommandPath);
+
+        result.Discord.push(...Discord);
+        result.Cli.push(...Cli);
       });
-    }
 
-    return { Executor, Controller, DiscordController, CliController };
+    return result;
   }
 
   /**
@@ -271,18 +226,8 @@ class ControllerLoader {
    * @param Controller The controller type to check.
    * @returns true if correct else false
    */
-  private static isDiscordController(
-    object: any,
-    Controller?: typeof BaseExecutor
-  ): object is DiscordController {
-    if (Controller) {
-      if (!(object instanceof Controller)) {
-        this.logger.log(
-          `[WARNING] The executor is not the extension of the class ${Controller.name}`
-        );
-        return false;
-      }
-    } else if (!(object.name && "data" in object && "execute" in object)) {
+  private static isDiscordController(object: any): object is DiscordController {
+    if (!(object.name && "data" in object && "execute" in object)) {
       this.logger.log(
         `[WARNING] The ${object} wrongly implements the discord command interface.`
       );
@@ -298,18 +243,8 @@ class ControllerLoader {
    * @param Controller The controller type to check.
    * @returns true if correct else false
    */
-  private static isCliController(
-    object: any,
-    Controller?: typeof BaseCliController
-  ): object is CliController {
-    if (Controller) {
-      if (!(object instanceof Controller)) {
-        this.logger.log(
-          `[WARNING] The executor is not the extension of the class ${Controller.name}`
-        );
-        return false;
-      }
-    } else if (!(object.name && "help" in object && "execute" in object)) {
+  private static isCliController(object: any): object is CliController {
+    if (!(object.name && "help" in object && "execute" in object)) {
       this.logger.log(
         `[WARNING] The ${object} wrongly implements the console command interface.`
       );

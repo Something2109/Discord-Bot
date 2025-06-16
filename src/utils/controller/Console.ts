@@ -1,4 +1,4 @@
-import { Executor, OptionExtraction, SubcommandExecutor } from "./Executor";
+import { Executor, OptionExtraction } from "./Executor";
 
 /**
  * The interface for the custom client to identify the command the bot can use.
@@ -29,11 +29,12 @@ type CliOptionData = {
   description: string;
 };
 
-type CliSubcommandOption = {
-  [key in string]?: CliOptionData[];
-};
+interface APIConsoleExecuteFlow<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> {
+  readonly executor: Executor<Options, Result>;
 
-interface APIDiscordExecuteFlow {
   /**
    * The function run before the executor function.
    * Can be used to set up the required conditions to run the main function.
@@ -49,7 +50,7 @@ interface APIDiscordExecuteFlow {
    * @param interaction The interaction to extract.
    * @returns An object contains all the extracted options
    */
-  extractOptions(input: string[]): Promise<OptionExtraction>;
+  extractOptions(input: string[]): Promise<Options>;
 
   /**
    * Get the discord reply to the command result.
@@ -58,7 +59,7 @@ interface APIDiscordExecuteFlow {
    * @param result Description of the result.
    * @returns The reply string.
    */
-  createReply(options: OptionExtraction, result: string): Promise<string>;
+  createReply(result: Result, options: Options): Promise<string>;
 
   /**
    * The function run after the message has been sent.
@@ -69,10 +70,17 @@ interface APIDiscordExecuteFlow {
   // postExecute(input: string[]): Promise<void>;
 }
 
-abstract class BaseCliController
-  implements CliController, APIDiscordExecuteFlow
+abstract class CliCommandController<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> implements CliController, APIConsoleExecuteFlow<Options, Result>
 {
-  abstract readonly executor: Executor;
+  readonly executor: Executor<Options, Result>;
+  readonly options?: CliOptionData[];
+
+  constructor(executor: Executor<Options, Result>, options?: CliOptionData[]) {
+    this.executor = executor;
+  }
 
   get name() {
     return this.executor.name;
@@ -80,7 +88,14 @@ abstract class BaseCliController
 
   help(): string {
     const command = `${this.executor.name}: ${this.executor.description}`;
-    return command;
+    let options: string[] = [];
+
+    if (this.options) {
+      options = this.options.map(
+        ({ name, description }) => `\t<${name}>: ${description}`
+      );
+    }
+    return [command, ...options].join("\n");
   }
 
   async execute(input: string[]) {
@@ -88,7 +103,7 @@ abstract class BaseCliController
     if (!message) {
       const options = await this.extractOptions(input);
       const result = await this.executor.execute(options);
-      message = await this.createReply(options, result);
+      message = await this.createReply(result, options);
     }
     return message;
   }
@@ -97,77 +112,49 @@ abstract class BaseCliController
     return undefined;
   }
 
-  async extractOptions(input: string[]) {
-    return {};
+  async extractOptions(_: string[]) {
+    return {} as Options;
   }
 
-  async createReply(options: OptionExtraction, result: string) {
-    return result;
-  }
-}
-
-abstract class CliCommandController extends BaseCliController {
-  readonly executor: Executor;
-  readonly options: CliOptionData[];
-
-  constructor(executor: Executor, options?: CliOptionData[]) {
-    super();
-    this.executor = executor;
-    this.options = options ?? [];
-  }
-
-  help(): string {
-    const command = super.help();
-    if (this.options) {
-      this.options.forEach(
-        ({ name, description }) => `\t<${name}>: ${description}`
-      );
-    }
-    return command;
+  async createReply(result: Result, _: Options) {
+    return result as string;
   }
 }
 
-abstract class CliSubcommandController<
-  SubcommandController extends Executor
-> extends BaseCliController {
-  readonly executor: SubcommandExecutor<SubcommandController>;
-  readonly options: CliSubcommandOption;
+class CliSubcommandController implements CliController {
+  readonly name: string;
+  readonly description: string;
+  private readonly executors: { [key in string]: CliController };
 
-  constructor(
-    executor: SubcommandExecutor<SubcommandController>,
-    options?: CliSubcommandOption
-  ) {
-    super();
-    this.executor = executor;
-    this.options = options ?? {};
+  constructor(name: string, description: string) {
+    this.name = name;
+    this.description = description;
+    this.executors = {};
+  }
+
+  add(...controllers: CliController[]) {
+    controllers.forEach((controller) => {
+      this.executors[controller.name] = controller;
+    });
   }
 
   help(): string {
-    const command = `${this.executor.name}: ${this.executor.description}`;
-    const subcommands = Object.values(this.executor.subcommands).map(
-      (data) => `\n\t${data.name}: ${data.description}`
+    const command = `${this.name}: ${this.description}`;
+    const subcommands = Object.values(this.executors).map(
+      (subcommand) => `\t${subcommand.help().replaceAll(/\n\t/g, "\n\t\t")}`
     );
-    return command.concat(...subcommands);
+    return [command, ...subcommands].join("\n");
   }
 
-  async extractOptions([subcommand, ...input]: string[]) {
-    const options: OptionExtraction = {
-      subcommand,
-    };
-    const optionList = this.options[subcommand];
-    if (optionList) {
-      for (let i = 0; i < Math.min(optionList.length, input.length); i++) {
-        options[optionList[i].name] = input[i];
-      }
+  async execute(input: string[]): Promise<string> {
+    const subcommand = input.shift();
+
+    if (!subcommand || !this.executors[subcommand]) {
+      return "No subcommand matched";
     }
 
-    return options;
+    return this.executors[subcommand].execute(input);
   }
 }
 
-export {
-  CliController,
-  BaseCliController,
-  CliCommandController,
-  CliSubcommandController,
-};
+export { CliController, CliCommandController, CliSubcommandController };

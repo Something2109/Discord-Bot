@@ -13,7 +13,8 @@ type OptionType =
   | number
   | Role
   | string
-  | User;
+  | User
+  | null;
 
 type OptionExtraction = {
   [key in string]?: OptionType;
@@ -24,7 +25,10 @@ type OptionExtraction = {
  * Contains the basic info the executor need
  * to interact with the command container and client.
  */
-interface Executor {
+interface Executor<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> {
   readonly name: string;
   readonly description: string;
 
@@ -33,10 +37,14 @@ interface Executor {
    * Taking the options from the parameters and execute.
    * @param options The option object to be taken.
    */
-  execute(options: OptionExtraction): Promise<string>;
+  execute(options: Options): Promise<Result>;
 }
 
-abstract class BaseExecutor implements Executor {
+abstract class BaseExecutor<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> implements Executor<Options, Result>
+{
   readonly name: string;
   readonly description: string;
 
@@ -45,58 +53,7 @@ abstract class BaseExecutor implements Executor {
     this.description = description;
   }
 
-  abstract execute(options: OptionExtraction): Promise<string>;
+  abstract execute(options: Options): Promise<Result>;
 }
 
-/**
- * A simple class of the executor to implement new executor class.
- */
-abstract class CommandExecutor extends BaseExecutor {
-  options?: ApplicationCommandOptionBase[];
-
-  abstract execute(options: OptionExtraction): Promise<string>;
-}
-
-/**
- * A simple class of multicommand executor
- * to implement new subcommand executor class.
- * Add subcommand to it by using the add function.
- */
-abstract class SubcommandExecutor<
-  Controller extends Executor
-> extends BaseExecutor {
-  readonly subcommands: {
-    [key in string]: Controller;
-  };
-
-  constructor(name: string, description: string) {
-    super(name, description);
-    this.subcommands = {};
-  }
-
-  /**
-   * The function to add subcommand to the executor.
-   * @param controllers The subcommand executor type to add to the executor.
-   */
-  public add(...controllers: Controller[]) {
-    controllers.forEach((controller) => {
-      this.subcommands[controller.name] = controller;
-    });
-  }
-
-  async execute(options: OptionExtraction) {
-    const subcommand = options.subcommand as string;
-    if (subcommand && this.subcommands[subcommand]) {
-      return this.subcommands[subcommand].execute(options);
-    }
-    return "No subcommand matched";
-  }
-}
-
-export {
-  OptionExtraction,
-  Executor,
-  BaseExecutor,
-  CommandExecutor,
-  SubcommandExecutor,
-};
+export { OptionExtraction, Executor, BaseExecutor };

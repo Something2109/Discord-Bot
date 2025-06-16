@@ -1,4 +1,8 @@
-import { ServerSubcommand } from "./template";
+import {
+  CliServerController,
+  DiscordServerController,
+  ServerSubcommand,
+} from "./template";
 import { ServerStatus } from "../../utils/mc-server/Server";
 
 export class StatusCommand extends ServerSubcommand {
@@ -18,3 +22,9 @@ export class StatusCommand extends ServerSubcommand {
     }
   }
 }
+
+const Exe = new StatusCommand();
+const Discord = new DiscordServerController(Exe);
+const Cli = new CliServerController(Exe);
+
+export { Discord, Cli };

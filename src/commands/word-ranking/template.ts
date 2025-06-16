@@ -1,36 +1,21 @@
-import {
-  APIEmbedField,
-  BaseMessageOptions,
-  ChatInputCommandInteraction,
-  SlashCommandStringOption,
-  SlashCommandUserOption,
-  userMention,
-} from "discord.js";
 import { Updater } from "../../utils/Updater";
+import { BannedWordList } from "../../utils/database/List/WordList";
 import { Database } from "../../utils/database/Database";
-import { BannedWordList, Ranking } from "../../utils/database/List/WordList";
 import {
-  CommandExecutor,
+  BaseExecutor,
   OptionExtraction,
-  SubcommandExecutor,
 } from "../../utils/controller/Executor";
 import {
-  DiscordSubcommandController,
-  DiscordSubcommandOption,
+  DiscordCommandController,
+  InteractionType,
 } from "../../utils/controller/Discord";
+import { BaseMessageOptions } from "discord.js";
 
-type InteractionType = ChatInputCommandInteraction;
-
-enum SubcommandNames {
-  Add = "add",
-  List = "list",
-  Remove = "remove",
-  Ranking = "ranking",
-}
-
-abstract class WordRankingSubcommand extends CommandExecutor {
+abstract class WordRankingSubcommand<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> extends BaseExecutor<Options, Result> {
   static wordList?: BannedWordList;
-  static result: Ranking[];
 
   get wordList() {
     return WordRankingSubcommand.wordList;
@@ -39,50 +24,16 @@ abstract class WordRankingSubcommand extends CommandExecutor {
   set wordList(list: BannedWordList | undefined) {
     WordRankingSubcommand.wordList = list;
   }
-
-  get result() {
-    return WordRankingSubcommand.result;
-  }
-
-  set result(result: Ranking[]) {
-    WordRankingSubcommand.result = result;
-  }
 }
 
-const discordOptions: DiscordSubcommandOption = {
-  [SubcommandNames.Add]: () => [
-    new SlashCommandStringOption()
-      .setName("word")
-      .setDescription("The word to track")
-      .setRequired(true),
-  ],
-  [SubcommandNames.Ranking]: () => [
-    new SlashCommandUserOption()
-      .setName("user")
-      .setDescription("The user to search"),
-    new SlashCommandStringOption()
-      .setName("word")
-      .setDescription("The word to search"),
-  ],
-  [SubcommandNames.Remove]: () => [
-    new SlashCommandStringOption()
-      .setName("word")
-      .setDescription("The word to delete")
-      .setRequired(true),
-  ],
-};
-
-class WordRankingController extends SubcommandExecutor<WordRankingSubcommand> {
-  constructor() {
-    super("word-ranking", "Tracking and ranking words");
-  }
-}
-
-class DiscordWordRankingController extends DiscordSubcommandController<WordRankingSubcommand> {
+class DiscordWordRankingController<
+  Options extends OptionExtraction | undefined = undefined,
+  Result extends any = string
+> extends DiscordCommandController<Options, Result> {
   readonly updater: Updater = new Updater("Word ranking");
 
-  constructor(executor: WordRankingController) {
-    super(executor, discordOptions);
+  constructor(executor: WordRankingSubcommand<Options, Result>) {
+    super(executor);
   }
 
   async preExecute(
@@ -91,32 +42,9 @@ class DiscordWordRankingController extends DiscordSubcommandController<WordRanki
     WordRankingSubcommand.wordList = Database.get(interaction.guild?.id)?.get(
       BannedWordList
     );
-    WordRankingSubcommand.result = [];
-    return undefined;
-  }
 
-  async createReply(options: OptionExtraction, description: string) {
-    let field: APIEmbedField[] = [];
-    if (
-      options.subcommand == SubcommandNames.List ||
-      options.subcommand == SubcommandNames.Ranking
-    ) {
-      field = WordRankingSubcommand.result?.map(({ id, word, count }, index) =>
-        Updater.field(
-          `#${index + 1}. Typed count: ${count}`,
-          id ? userMention(id) : word ? word : ""
-        )
-      );
-    }
-    return this.updater.message({
-      description,
-      field,
-    });
+    return undefined;
   }
 }
 
-export {
-  WordRankingSubcommand,
-  WordRankingController,
-  DiscordWordRankingController,
-};
+export { WordRankingSubcommand, DiscordWordRankingController };

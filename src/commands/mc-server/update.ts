@@ -1,7 +1,11 @@
-import { ServerSubcommand } from "./template";
+import {
+  CliServerController,
+  DiscordServerController,
+  ServerSubcommand,
+} from "./template";
 import { ServerStatus } from "../../utils/mc-server/Server";
 
-export class StartCommand extends ServerSubcommand {
+export class UpdateCommand extends ServerSubcommand {
   constructor() {
     super("update", "Update the minecraft server");
   }
@@ -17,3 +21,9 @@ export class StartCommand extends ServerSubcommand {
     return "Server has been updated to the newest version";
   }
 }
+
+const Exe = new UpdateCommand();
+const Discord = new DiscordServerController(Exe);
+const Cli = new CliServerController(Exe);
+
+export { Discord, Cli };

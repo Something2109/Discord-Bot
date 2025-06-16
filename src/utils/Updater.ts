@@ -2,6 +2,7 @@ import {
   APIEmbedField,
   BaseMessageOptions,
   Message,
+  SendableChannels,
   TextBasedChannel,
 } from "discord.js";
 
@@ -21,7 +22,7 @@ interface MessageAPI {
  */
 class Updater {
   private readonly title: string;
-  private textChannel: TextBasedChannel | undefined;
+  private textChannel: SendableChannels | undefined;
 
   constructor(title: string) {
     this.title = title;
@@ -30,7 +31,7 @@ class Updater {
   /**
    * Set the channel to update the new message to.
    */
-  set channel(channel: TextBasedChannel) {
+  set channel(channel: SendableChannels) {
     this.textChannel = channel;
   }
 

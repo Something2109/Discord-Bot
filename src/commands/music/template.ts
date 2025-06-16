@@ -1,7 +1,7 @@
 import {
   ChatInputCommandInteraction,
   GuildMember,
-  TextBasedChannel,
+  SendableChannels,
   VoiceBasedChannel,
 } from "discord.js";
 import { Updater } from "../../utils/Updater";
@@ -43,7 +43,7 @@ class DiscordMusicController<
     if (interaction instanceof ChatInputCommandInteraction) {
       const client = interaction.client as CustomClient;
 
-      this.updater.channel = interaction.channel as TextBasedChannel;
+      this.updater.channel = interaction.channel as SendableChannels;
 
       const member = interaction.member as GuildMember;
       const userVoiceChannel = member.voice.channel as VoiceBasedChannel;

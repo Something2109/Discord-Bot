@@ -1,8 +1,4 @@
-import {
-  APIEmbedField,
-  TextBasedChannel,
-  SlashCommandStringOption,
-} from "discord.js";
+import { SendableChannels } from "discord.js";
 import {
   DefaultServer,
   Server,
@@ -57,7 +53,7 @@ class DiscordServerController<
       });
     }
 
-    this.updater.channel = interaction.channel as TextBasedChannel;
+    this.updater.channel = interaction.channel as SendableChannels;
     return undefined;
   }
 

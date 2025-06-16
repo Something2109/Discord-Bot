@@ -1,6 +1,7 @@
 import { Client, ClientOptions } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
+import { CommandLoader } from "./controller/Loader";
 import { Database } from "./database/Database";
 import { Logger } from "./Logger";
 import { Connection, DefaultConnection } from "./music/Connection";
@@ -61,4 +62,35 @@ class CustomClient extends Client {
   }
 }
 
-export { CustomClient };
+class ConsoleClient {
+  public readonly logger: Logger;
+
+  constructor() {
+    this.logger = new Logger("CLI");
+  }
+
+  /**
+   * The function called when the readline interface has a new input line inserted.
+   * The function search the command based on the splitted input string and execute it.
+   * @param input The input string from the readline interface.
+   */
+  execute(input: string) {
+    if (input.length > 0) {
+      const [commandName, ...option] = input.split(" ");
+      const executor = commandName ? CommandLoader.cli.get(commandName) : null;
+
+      if (executor) {
+        this.logger.log(
+          `Executing ${commandName} sent from the console line interface.`
+        );
+        executor.execute(option).then((result: string) => {
+          this.logger.log(result);
+        });
+      } else {
+        this.logger.log(`Cannot find command name from key ${commandName}`);
+      }
+    }
+  }
+}
+
+export { CustomClient, ConsoleClient };

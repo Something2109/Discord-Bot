@@ -10,17 +10,19 @@ class FileLog {
   private static stream = FileLog.createStream();
 
   static createStream() {
-    const logDir = path.join(
-      ".",
-      "log",
-      `${FileLog.date.toLocaleDateString().replaceAll("/", "-")}.txt`
-    );
+    const logDir = path.join(".", "log");
 
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
 
-    return fs.createWriteStream(logDir, { flags: "a" });
+    return fs.createWriteStream(
+      path.join(
+        logDir,
+        `${FileLog.date.toLocaleDateString().replaceAll("/", "-")}.txt`
+      ),
+      { flags: "a" }
+    );
   }
 
   /**
